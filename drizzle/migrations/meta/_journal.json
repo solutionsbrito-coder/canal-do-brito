@@ -1,0 +1,48 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1790606434978,
+      "tag": "0000_retire_sportsapi_integration",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790609303443,
+      "tag": "0001_create_schedule_publication_versions",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790609345306,
+      "tag": "0002_add_atomic_schedule_version_restore",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790609529963,
+      "tag": "0003_schedule_daily_manual_program_cleanup",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790609606015,
+      "tag": "0004_preserve_full_manual_schedule_snapshot_on_restore",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791303357055,
+      "tag": "0005_lighten_scheduled_jobs",
+      "breakpoints": true
+    }
+  ]
+}

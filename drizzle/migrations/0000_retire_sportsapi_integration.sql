@@ -1,0 +1,12 @@
+COMMENT ON TABLE public.sportsapi_suggestions IS 'DEPRECATED: SportsAPI integration removed; retained empty for zero-downtime compatibility.';
+COMMENT ON TABLE public.sportsapi_sync_runs IS 'DEPRECATED: SportsAPI integration removed; retained empty for zero-downtime compatibility.';
+COMMENT ON COLUMN public.daily_games.external_source IS 'DEPRECATED: SportsAPI integration removed.';
+COMMENT ON COLUMN public.daily_games.external_sport IS 'DEPRECATED: SportsAPI integration removed.';
+COMMENT ON COLUMN public.daily_games.api_status IS 'DEPRECATED: SportsAPI integration removed.';
+COMMENT ON COLUMN public.daily_games.live_clock IS 'DEPRECATED: SportsAPI integration removed.';
+COMMENT ON COLUMN public.daily_games.period IS 'DEPRECATED: SportsAPI integration removed.';
+COMMENT ON COLUMN public.daily_games.broadcast_country IS 'DEPRECATED: SportsAPI integration removed.';
+COMMENT ON COLUMN public.daily_games.last_api_sync_at IS 'DEPRECATED: SportsAPI integration removed.';
+COMMENT ON COLUMN public.daily_games.api_payload_summary IS 'DEPRECATED: SportsAPI integration removed.';
+REVOKE ALL ON TABLE public.sportsapi_suggestions FROM anon, authenticated;
+REVOKE ALL ON TABLE public.sportsapi_sync_runs FROM anon, authenticated;
