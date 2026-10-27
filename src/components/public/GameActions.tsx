@@ -9,6 +9,8 @@ import { isCompetitionFollowed, isSportFollowed, isTeamFollowed } from "@/lib/me
 import { getMinutesUntilStart, isGameCurrentlyLive, SPORT_LABEL, type SportType } from "@/lib/gameUtils";
 import { detectedSport } from "@/components/agenda/public/highlightsCuration";
 import { downloadGameIcs } from "@/lib/ics";
+import { renderGameSharePng } from "@/lib/shareCard";
+import { ShareCardButton } from "@/components/public/ShareCardButton";
 
 interface GameActionsProps {
   game: DailyGame;
@@ -109,6 +111,22 @@ export const GameActions = ({ game, showFollow = true }: GameActionsProps) => {
           {isReminded ? <BellRing className="h-3.5 w-3.5" aria-hidden /> : <Bell className="h-3.5 w-3.5" aria-hidden />}
           {isReminded ? "Lembrete ativo" : "Me avise 15 min antes"}
         </button>
+      )}
+      {(upcoming || live) && (
+        <ShareCardButton
+          label="Compartilhar como imagem"
+          filename={`canal-do-brito-${game.id}.png`}
+          render={() =>
+            renderGameSharePng({
+              home_team: game.home_team,
+              away_team: game.away_team || null,
+              date: game.date,
+              game_time: game.game_time,
+              competition: game.competition,
+              channelsText: (game.channels ?? []).join(" • "),
+            })
+          }
+        />
       )}
       {upcoming && (
         <button

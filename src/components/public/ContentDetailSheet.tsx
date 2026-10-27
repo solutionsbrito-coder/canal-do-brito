@@ -5,6 +5,8 @@ import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { useUpsertProgress } from "@/hooks/useWatchProgress";
 import { lockBodyScroll, unlockBodyScroll } from "@/lib/bodyScrollLock";
 import { X, Play, Loader2, ExternalLink } from "lucide-react";
+import { ShareCardButton } from "@/components/public/ShareCardButton";
+import { renderTitleSharePng } from "@/lib/shareCard";
 import { motion, AnimatePresence, useMotionValue, useTransform, useDragControls, type PanInfo } from "framer-motion";
 
 interface ContentDetailSheetProps {
@@ -191,6 +193,24 @@ export const ContentDetailSheet = forwardRef<HTMLDivElement, ContentDetailSheetP
                     </div>
                   </div>
                 </div>
+
+                {(item.content_type === "movie" || item.content_type === "series" || item.content_type === "tv") && (
+                <div className="flex flex-wrap gap-2">
+                  <ShareCardButton
+                    label="Compartilhar como imagem"
+                    filename={`canal-do-brito-${(item.title || "titulo").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "titulo"}.png`}
+                    render={() =>
+                      renderTitleSharePng({
+                        title: item.title,
+                        kind: item.content_type === "series" || item.content_type === "tv" ? "series" : "movie",
+                        year: item.year ?? null,
+                        genre: item.genre ?? null,
+                        category: null,
+                      })
+                    }
+                  />
+                </div>
+                )}
 
                 {item.overview && (
                   <div>

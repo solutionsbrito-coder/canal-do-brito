@@ -22,6 +22,7 @@ import { PosterRail } from "@/components/public/cinema/PosterRail";
 import { CinemaCategoryRail, type CinemaCategory } from "@/components/public/cinema/CinemaCategoryRail";
 import { PremiumCTA } from "@/components/public/cinema/PremiumCTA";
 import { useCinemaShelves, type CinemaItem } from "@/components/public/cinema/useCinemaShelves";
+import { CatalogCarousels, MinhaListaSection } from "@/components/public/CatalogCarousels";
 
 /** Defer trailer prefetch until browser is idle — não compete com primeira renderização. */
 const useDeferred = <T,>(value: T, ready: boolean): T | undefined => {
@@ -259,6 +260,14 @@ export const NovidadesPage = () => {
               />
             ))
           )}
+        </div>
+      )}
+
+      {/* Carrosséis do catálogo próprio + Minha lista (Lote 2, sem login) */}
+      {filter === "all" && (
+        <div className="space-y-8">
+          <CatalogCarousels />
+          <MinhaListaSection />
         </div>
       )}
 

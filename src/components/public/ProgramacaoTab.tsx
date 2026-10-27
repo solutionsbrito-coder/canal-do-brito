@@ -19,6 +19,12 @@ import { isValidDateParam } from "@/lib/agendaRedirect";
 import { useChannelMappings } from "@/hooks/useChannelMappings";
 import { resolveChannel, resolveChannels } from "@/lib/channelResolver";
 import { track } from "@/lib/analytics";
+import { toast } from "sonner";
+import {
+  buildFilteredAgendaUrl,
+  parseAgendaUrlFilters,
+  serializeAgendaUrlFilters,
+} from "@/lib/urlFilters";
 
 import { LiveHeroCard } from "@/components/agenda/public/LiveHeroCard";
 import { SportFilterBar, type FilterValue } from "@/components/agenda/public/SportFilterBar";
@@ -77,14 +83,21 @@ const ProgramacaoTab = () => {
   const dateIsAllowed = rawDate ? rawDate === today || rawDate === tomorrow : true;
   const date = rawDate && dateIsAllowed ? rawDate : today;
 
+  // Filtros persistentes na URL (Lote 2): a URL manda; sem param na URL,
+  // vale o que estava salvo na sessão. Ex.: ?esporte=basketball,
+  // ?time=Palmeiras, ?competicao=Brasileirão.
+  const urlFilters = parseAgendaUrlFilters(params);
   const [filter, setFilterState] = useState<FilterValue>(() => {
+    if (params.has("esporte")) return urlFilters.esporte;
     try { return (sessionStorage.getItem("agenda:sport") as FilterValue) || "all"; } catch { return "all"; }
   });
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => urlFilters.q);
   const [status, setStatusState] = useState<StatusFilter>(() => {
+    if (params.has("status")) return urlFilters.status;
     try { return (sessionStorage.getItem("agenda:status") as StatusFilter) || "all"; } catch { return "all"; }
   });
   const [sort, setSortState] = useState<SortMode>(() => {
+    if (params.has("ordem")) return urlFilters.ordem;
     try {
       const saved = sessionStorage.getItem("agenda:sort");
       return saved === "sport" || saved === "time" ? saved : "time";
@@ -93,8 +106,11 @@ const ProgramacaoTab = () => {
     }
   });
   const [channel, setChannelState] = useState<string | null>(() => {
+    if (params.has("canal")) return urlFilters.canal;
     try { return sessionStorage.getItem("agenda:channel"); } catch { return null; }
   });
+  const [team, setTeam] = useState(() => urlFilters.time);
+  const [competition, setCompetition] = useState(() => urlFilters.competicao);
 
   // Analytics simples (sem ranking público)
   const setStatus = useCallback((v: StatusFilter) => {
@@ -135,6 +151,29 @@ const ProgramacaoTab = () => {
       else sessionStorage.removeItem("agenda:channel");
     } catch { /* noop */ }
   }, [channel]);
+
+  // Espelha os filtros na URL (replace, sem empilhar histórico) para o
+  // link copiado abrir já filtrado. Preserva ?date; só escreve quando
+  // a URL realmente difere do estado, para não entrar em loop com o
+  // setParams do goToDate nem com a limpeza defensiva de ?date.
+  useEffect(() => {
+    const current = new URLSearchParams(params);
+    const next = serializeAgendaUrlFilters({
+      esporte: filter,
+      status,
+      ordem: sort,
+      canal: channel,
+      q: search,
+      time: team,
+      competicao: competition,
+    });
+    const dateParam = current.get("date");
+    if (dateParam) next.set("date", dateParam);
+    if (next.toString() !== current.toString()) {
+      setParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, status, sort, channel, search, team, competition]);
 
   // Defensive cleanup: drop ?date if it's not today/tomorrow (or is malformed).
   useEffect(() => {
@@ -254,9 +293,11 @@ const ProgramacaoTab = () => {
       .slice(0, 14);
   }, [games, channelMappings]);
 
-  // Pipeline de filtros: busca → status → canal → esporte
+  // Pipeline de filtros: busca → status → canal → time → competição → esporte
   const filtered = useMemo(() => {
     const q = norm(search);
+    const teamQ = norm(team);
+    const compQ = norm(competition);
     // Chave do canal buscado ("ESPN2" → espn2, "Sportv" → sportv, alias "PFC" → premiere)
     const qChannelKey = q ? resolveChannel(search, channelMappings).key : "";
     const qCompact = q.replace(/[^a-z0-9+]/g, "");
@@ -264,6 +305,8 @@ const ProgramacaoTab = () => {
       if (!matchesStatus(g, status)) return false;
       const info = channelInfoById.get(g.id);
       if (channel && !(info?.keys.has(channel) ?? false)) return false;
+      if (teamQ && !norm(`${g.home_team} ${g.away_team ?? ""}`).includes(teamQ)) return false;
+      if (compQ && !norm(g.competition).includes(compQ)) return false;
       if (q) {
         const sport = detectedSport(g);
         const hay = norm(
@@ -280,7 +323,7 @@ const ProgramacaoTab = () => {
       }
       return true;
     });
-  }, [games, search, status, channel, matchesStatus, channelInfoById, channelMappings]);
+  }, [games, search, status, channel, team, competition, matchesStatus, channelInfoById, channelMappings]);
 
   const grouped = useMemo(() => {
     const out = groupBySport(filtered);
@@ -329,7 +372,39 @@ const ProgramacaoTab = () => {
     setSearch("");
     setStatusState("all");
     setChannelState(null);
+    setTeam("");
+    setCompetition("");
   }, []);
+
+  const copyFilteredLink = useCallback(async () => {
+    const url = buildFilteredAgendaUrl(
+      window.location.origin,
+      window.location.pathname,
+      {
+        esporte: filter,
+        status,
+        ordem: sort,
+        canal: channel,
+        q: search,
+        time: team,
+        competicao: competition,
+      },
+      params.get("date"),
+    );
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Link filtrado copiado!");
+    } catch {
+      // Fallback para navegadores sem acesso ao clipboard.
+      const ta = document.createElement("textarea");
+      ta.value = url;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+      toast.success("Link filtrado copiado!");
+    }
+  }, [filter, status, sort, channel, search, team, competition, params]);
 
   const goToDate = (newDate: string) => {
     if (newDate !== today && newDate !== tomorrow) return;
@@ -368,7 +443,7 @@ const ProgramacaoTab = () => {
     [visibleSports, grouped],
   );
 
-  const hasActiveFilters = !!search || status !== "all" || !!channel || filter !== "all";
+  const hasActiveFilters = !!search || status !== "all" || !!channel || filter !== "all" || !!team || !!competition;
   const nothingMatches = !isLoading && total > 0 && visibleGames.length === 0;
   // Com filtros ativos, o carrossel sai do caminho para a lista aparecer logo
   const showHighlights = !hasActiveFilters && highlights.length > 0;
@@ -533,6 +608,43 @@ const ProgramacaoTab = () => {
             channel={channel}
             onChannel={setChannel}
           />
+
+          {/* Filtros vindos da URL (?time= / ?competicao=) + copiar link filtrado (Lote 2) */}
+          {(team || competition) && (
+            <div className="flex flex-wrap items-center gap-2 mb-4" aria-label="Filtros do link">
+              {team && (
+                <button
+                  type="button"
+                  onClick={() => setTeam("")}
+                  aria-label={`Remover filtro de time ${team}`}
+                  className="inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-full text-[11px] font-bold bg-primary/15 text-primary border border-primary/30 active:scale-95 transition"
+                >
+                  Time: {team} ✕
+                </button>
+              )}
+              {competition && (
+                <button
+                  type="button"
+                  onClick={() => setCompetition("")}
+                  aria-label={`Remover filtro de competição ${competition}`}
+                  className="inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-full text-[11px] font-bold bg-primary/15 text-primary border border-primary/30 active:scale-95 transition"
+                >
+                  Competição: {competition} ✕
+                </button>
+              )}
+            </div>
+          )}
+          {hasActiveFilters && (
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={copyFilteredLink}
+                className="inline-flex items-center gap-1.5 min-h-[36px] px-4 rounded-full text-[11px] font-bold bg-white/[0.06] text-white/80 border border-white/10 hover:bg-white/10 active:scale-95 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+              >
+                🔗 Copiar link filtrado
+              </button>
+            </div>
+          )}
 
           {(sportsSorted.length > 1 || filter !== "all") && (
             <SportFilterBar
