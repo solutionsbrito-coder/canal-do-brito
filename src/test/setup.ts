@@ -17,6 +17,20 @@ vi.mock("@/hooks/useWatchProgress", () => ({
   useDeleteProgress: () => ({ mutate: vi.fn() }),
 }));
 
+// Mock usePushSubscription globally (Lote 1): GameCard/GamePremiumCard
+// render GameActions, que usa o sino — sem isso, os testes precisariam
+// de QueryClientProvider só por causa do useSettings do push.
+vi.mock("@/hooks/usePushSubscription", () => ({
+  usePushSubscription: () => ({
+    permission: "default" as NotificationPermission,
+    subscription: null,
+    subscribe: async () => null,
+    addGameReminder: async () => true,
+    removeGameReminder: async () => true,
+    isSupported: true,
+  }),
+}));
+
 // Polyfill ResizeObserver for jsdom (used by Recharts)
 (globalThis as any).ResizeObserver = class {
   observe() {}

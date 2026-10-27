@@ -2,6 +2,7 @@ import { memo } from "react";
 import { motion } from "framer-motion";
 import { Clock, Flame } from "lucide-react";
 import type { DailyGame } from "@/hooks/useDailyGames";
+import { GameActions } from "@/components/public/GameActions";
 import {
   isGameCurrentlyLive,
   getMinutesUntilStart,
@@ -17,11 +18,17 @@ import { getSportTheme, isHighlightCompetition } from "./GameCardSportTheme";
 interface GameCardProps {
   game: DailyGame;
   index: number;
-  /** Kept for API compatibility; reminder UI removed. */
+  /**
+   * Legado: o sino agora é auto-contido em GameActions (push anônimo,
+   * sem login). Mantido para compatibilidade com PeriodGroup; pode ser
+   * ignorado — GameActions já grava o lembrete no servidor.
+   */
   onPushReminder?: (gameId: string, add: boolean) => void;
+  /** Falso na prévia do admin, para não gravar follows/lembretes de teste. */
+  showActions?: boolean;
 }
 
-const GameCardImpl = ({ game, index }: GameCardProps) => {
+const GameCardImpl = ({ game, index, showActions = true }: GameCardProps) => {
   const sportType = (game.sport_type || "football") as SportType;
   const theme = getSportTheme(sportType);
   const sportLabel = SPORT_LABEL[sportType] || theme.label;
@@ -172,6 +179,7 @@ const GameCardImpl = ({ game, index }: GameCardProps) => {
               Sem transmissão confirmada
             </span>
           )}
+          {showActions && <GameActions game={game} />}
         </div>
       </div>
     </motion.article>

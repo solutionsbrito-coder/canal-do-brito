@@ -26,6 +26,8 @@ import { ContentListFilters } from "@/components/admin/content/ContentListFilter
 import { ContentListHeader } from "@/components/admin/content/ContentListHeader";
 import { ContentPagination } from "@/components/admin/content/ContentPagination";
 import { SortableContentRow } from "@/components/admin/content/SortableContentRow";
+import { CatalogFieldsDialog } from "@/components/admin/CatalogFieldsDialog";
+import { normalizeCatalogFields, type CatalogFields } from "@/lib/catalogFields";
 import { TMDBSearchGrid } from "@/components/admin/content/TMDBSearchGrid";
 import { sortContent, usePersistedSort, useContentSelection } from "@/components/admin/content/contentListUtils";
 import { Clapperboard, Search, Loader2, X } from "lucide-react";
@@ -54,6 +56,7 @@ const AdminSeries = () => {
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
   const [searched, setSearched] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<FeaturedSeries | null>(null);
+  const [editingCatalog, setEditingCatalog] = useState<FeaturedSeries | null>(null);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkRunning, setBulkRunning] = useState(false);
   const [listSearch, setListSearch] = useState("");
@@ -405,6 +408,7 @@ const AdminSeries = () => {
                         onRefresh={() => handleRefreshOne(s)}
                         onToggle={(v) => toggleSeries.mutate({ id: s.id, active: v })}
                         onDelete={() => setPendingDelete(s)}
+                        onEditCatalog={() => setEditingCatalog(s)}
                       />
                     ))}
                   </div>
@@ -430,6 +434,22 @@ const AdminSeries = () => {
           )}
         </div>
       </div>
+
+      {editingCatalog && (
+        <CatalogFieldsDialog
+          open={!!editingCatalog}
+          onOpenChange={(o) => !o && setEditingCatalog(null)}
+          title={editingCatalog.title}
+          initial={normalizeCatalogFields(editingCatalog)}
+          saving={updateSeries.isPending}
+          onSave={(fields: CatalogFields) => {
+            updateSeries.mutate({ id: editingCatalog.id, ...fields }, {
+              onSuccess: () => { toast.success("Catálogo atualizado!"); setEditingCatalog(null); },
+              onError: (e: any) => toast.error(e?.message ?? "Falha ao salvar o catálogo"),
+            });
+          }}
+        />
+      )}
 
       <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
         <AlertDialogContent>

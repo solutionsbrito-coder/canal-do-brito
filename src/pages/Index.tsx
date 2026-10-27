@@ -10,6 +10,7 @@ import { captureLandingAttribution, getStoredAttribution, track } from "@/lib/an
 
 const ProgramacaoTab = lazy(() => import("@/components/public/ProgramacaoTab"));
 const LazyNovidadesPage = lazy(() => import("@/components/public/NovidadesPage").then(m => ({ default: m.NovidadesPage })));
+const LazyMeusJogosTab = lazy(() => import("@/components/public/MeusJogosTab"));
 
 const LazyAnalyticsDebugOverlay = lazy(() => import("@/components/public/AnalyticsDebugOverlay"));
 
@@ -27,7 +28,7 @@ const BelowFoldSkeleton = () => (
   </div>
 );
 
-const TAB_ORDER = ["schedule", "novidades"] as const;
+const TAB_ORDER = ["schedule", "meucanal", "novidades"] as const;
 type TabId = typeof TAB_ORDER[number];
 
 const Index = () => {
@@ -113,6 +114,13 @@ const Index = () => {
   }, [activeTab]);
 
   const renderContent = () => {
+    if (activeTab === "meucanal") {
+      return (
+        <Suspense fallback={<ScheduleFallback />}>
+          <LazyMeusJogosTab />
+        </Suspense>
+      );
+    }
     if (activeTab === "novidades") {
       return (
         <Suspense fallback={<BelowFoldSkeleton />}>

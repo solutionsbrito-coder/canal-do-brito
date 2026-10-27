@@ -112,7 +112,7 @@ export function ChannelPreviewStage({ initialChannel = "", value, onChange }: Pr
 
         <TabsContent value="schedule" className="mt-3">
           <div className="rounded-md border border-border/30 bg-background/60 p-4 max-w-sm mx-auto">
-            <GameCard game={mockGame} index={0} />
+            <GameCard game={mockGame} index={0} showActions={false} />
           </div>
           <p className="text-[10px] text-muted-foreground mt-2 text-center">
             Card real da Programação com canal injetado.

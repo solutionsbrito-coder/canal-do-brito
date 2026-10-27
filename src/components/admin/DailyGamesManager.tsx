@@ -6,6 +6,7 @@ import { detectSportType, SPORT_EMOJI, SPORT_LABEL, getLocalDateString, isNonAdv
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { gameKey } from "@/lib/dedup";
+import { findGameWarnings, hasWarnings, type GameWarnings } from "@/lib/gameWarnings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -566,6 +567,7 @@ export const DailyGamesManager = () => {
             date={selectedDate}
             onClose={() => setShowAddForm(false)}
             insertGames={insertGames}
+            existingGames={games ?? []}
           />
         )}
 
@@ -1067,10 +1069,12 @@ const AddGameForm = ({
   date,
   onClose,
   insertGames,
+  existingGames,
 }: {
   date: string;
   onClose: () => void;
   insertGames: any;
+  existingGames: any[];
 }) => {
   const [home, setHome] = useState("");
   const [away, setAway] = useState("");
@@ -1078,13 +1082,29 @@ const AddGameForm = ({
   const [time, setTime] = useState("");
   const [channels, setChannels] = useState("");
   const [sportMode, setSportMode] = useState<"auto" | SportType>("auto");
+  /** Avisos do Lote 1: exibidos antes de inserir; nunca bloqueiam sozinhos. */
+  const [warnings, setWarnings] = useState<GameWarnings | null>(null);
 
-  const handleAdd = async () => {
+  const handleAdd = async (force = false) => {
     const trimmedHome = home.trim();
     const trimmedAway = away.trim();
     if (!trimmedHome || !/^\d{2}:\d{2}$/.test(time)) {
       toast.error("Preencha o evento/time e o horário (HH:MM)");
       return;
+    }
+
+    // Lote 1: checa duplicata (mesma data + confronto) e conflito de
+    // horário (mesma data + horário, outro confronto) nos jogos não
+    // arquivados do dia. Com aviso, pede confirmação; sem aviso, insere.
+    if (!force) {
+      const found = findGameWarnings(
+        (existingGames ?? []).filter((g: any) => !g.archived),
+        { date, home_team: trimmedHome, away_team: trimmedAway, game_time: time },
+      );
+      if (hasWarnings(found)) {
+        setWarnings(found);
+        return;
+      }
     }
 
     const resolvedSport: SportType =
@@ -1147,8 +1167,37 @@ const AddGameForm = ({
           ))}
         </SelectContent>
       </Select>
+      {warnings && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 space-y-2" role="alert">
+          <p className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+            <AlertTriangle className="h-3.5 w-3.5" /> Atenção — já existe algo parecido neste dia:
+          </p>
+          {warnings.duplicates.length > 0 && (
+            <p className="text-xs text-white/85">
+              <span className="font-bold">Duplicata provável:</span> {warnings.duplicates.join("; ")}
+            </p>
+          )}
+          {warnings.timeConflicts.length > 0 && (
+            <p className="text-xs text-white/85">
+              <span className="font-bold">Mesmo horário:</span> {warnings.timeConflicts.join("; ")}
+            </p>
+          )}
+          <p className="text-[11px] text-white/60">
+            Isso é só um aviso — você pode inserir mesmo assim. Se preferir, clique em Revisar, ajuste os
+            campos e clique em Adicionar novamente para rechecar.
+          </p>
+          <div className="flex gap-2 pt-1">
+            <Button size="sm" onClick={() => handleAdd(true)} disabled={insertGames.isPending} className="h-8 text-xs bg-amber-600 hover:bg-amber-600/90">
+              Inserir mesmo assim
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setWarnings(null)} className="h-8 text-xs">
+              Revisar
+            </Button>
+          </div>
+        </div>
+      )}
       <div className="flex gap-2">
-        <Button size="sm" onClick={handleAdd} disabled={insertGames.isPending} className="h-7 text-xs bg-emerald-600">
+        <Button size="sm" onClick={() => handleAdd(false)} disabled={insertGames.isPending} className="h-7 text-xs bg-emerald-600">
           <Plus className="h-3 w-3 mr-1" /> {insertGames.isPending ? "Adicionando..." : "Adicionar"}
         </Button>
         <Button size="sm" variant="ghost" onClick={onClose} className="h-7 text-xs">

@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import type { DailyGame } from "@/hooks/useDailyGames";
+import { GameActions } from "@/components/public/GameActions";
 import { ChannelBadgeList } from "@/components/public/ChannelBadge";
 import {
   isGameCurrentlyLive,
@@ -19,9 +20,15 @@ interface Props {
   index: number;
   /** Mostra o esporte no card (usado na ordenação por horário). */
   showSport?: boolean;
+  /**
+   * Ações públicas do Lote 1 (sino 15 min, ICS, seguir) — sem login.
+   * Falso por padrão para a prévia do admin não gravar follows/lembretes
+   * de teste; as seções públicas passam true explicitamente.
+   */
+  showActions?: boolean;
 }
 
-export const GamePremiumCard = ({ game, index, showSport = false }: Props) => {
+export const GamePremiumCard = ({ game, index, showSport = false, showActions = false }: Props) => {
   const sport = detectedSport(game);
   const theme = themeFor(sport);
   const time = game.game_time.slice(0, 5);
@@ -147,6 +154,7 @@ export const GamePremiumCard = ({ game, index, showSport = false }: Props) => {
               </span>
             )}
           </div>
+          {showActions && <GameActions game={game} />}
         </div>
       </div>
     </motion.article>

@@ -14,6 +14,12 @@ export interface FeaturedMovie {
   active: boolean;
   created_at: string;
   sort_order: number;
+  /** Lote 1 — catálogo próprio (colunas novas; null = título pré-migration). */
+  available_in_catalog?: boolean | null;
+  catalog_category?: string | null;
+  internal_link?: string | null;
+  featured?: boolean | null;
+  leaves_at?: string | null;
 }
 
 export const useActiveMovies = () =>
@@ -78,7 +84,7 @@ export const useToggleMovie = () => {
 export const useUpdateMovie = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; genre?: string | null; rating?: number | null; overview?: string | null; poster_url?: string | null; backdrop_url?: string | null }) => {
+    mutationFn: async ({ id, ...updates }: { id: string; genre?: string | null; rating?: number | null; overview?: string | null; poster_url?: string | null; backdrop_url?: string | null; available_in_catalog?: boolean | null; catalog_category?: string | null; internal_link?: string | null; featured?: boolean | null; leaves_at?: string | null }) => {
       const { error } = await supabase.from("featured_movies").update(updates).eq("id", id);
       if (error) throw error;
     },

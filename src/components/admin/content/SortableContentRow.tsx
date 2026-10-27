@@ -3,7 +3,8 @@ import { CSS } from "@dnd-kit/utilities";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { AlertTriangle, GripVertical, ImageOff, RefreshCw, Star, Trash2 } from "lucide-react";
+import { AlertTriangle, GripVertical, ImageOff, Pencil, RefreshCw, Star, Trash2 } from "lucide-react";
+import { missingCatalogFields, normalizeCatalogFields, type CatalogFields } from "@/lib/catalogFields";
 
 const ratingColor = (r: number) => (r >= 7 ? "text-emerald-400" : r >= 5 ? "text-amber-400" : "text-red-400");
 
@@ -17,6 +18,12 @@ export interface ContentRowItem {
   active: boolean;
   overview?: string | null;
   backdrop_url?: string | null;
+  /** Lote 1 — catálogo próprio (ausente = título pré-migration). */
+  available_in_catalog?: boolean | null;
+  catalog_category?: string | null;
+  internal_link?: string | null;
+  featured?: boolean | null;
+  leaves_at?: string | null;
 }
 
 /** Lista o que falta para o item ficar "completo" na vitrine pública. */
@@ -27,6 +34,7 @@ export const getMissingFields = (item: ContentRowItem): string[] => {
   if (!item.genre) missing.push("gênero");
   if (!item.overview) missing.push("sinopse");
   if (!item.year) missing.push("ano");
+  missing.push(...missingCatalogFields(normalizeCatalogFields(item)));
   return missing;
 };
 
@@ -44,6 +52,8 @@ interface SortableContentRowProps {
   onRefresh: () => void;
   onToggle: (active: boolean) => void;
   onDelete: () => void;
+  /** Lote 1: abre o formulário de catálogo próprio do título. */
+  onEditCatalog?: () => void;
 }
 
 /** Linha arrastável compartilhada por Filmes e Séries. */
@@ -60,6 +70,7 @@ export const SortableContentRow = ({
   onRefresh,
   onToggle,
   onDelete,
+  onEditCatalog,
 }: SortableContentRowProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
@@ -126,6 +137,10 @@ export const SortableContentRow = ({
             </>
           )}
           {item.genre && <span className={`${genreClass} truncate`}>• {item.genre}</span>}
+          {item.featured ? <span className="text-amber-300">• Destaque</span> : null}
+          {item.available_in_catalog === false ? <span className="text-white/50">• Fora do catálogo</span> : null}
+          {item.leaves_at ? <span className="text-white/50">• Sai em {item.leaves_at}</span> : null}
+          {item.catalog_category ? <span className="text-white/50 truncate">• {item.catalog_category}</span> : null}
         </p>
         {(() => {
           const missing = getMissingFields(item);
@@ -139,6 +154,19 @@ export const SortableContentRow = ({
       </div>
 
       <div className="flex items-center gap-0.5 shrink-0">
+        {onEditCatalog && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-11 w-11 rounded-lg text-muted-foreground hover:text-foreground transition-all duration-200"
+            disabled={disabled}
+            onClick={onEditCatalog}
+            aria-label={`Editar catálogo próprio de ${item.title}`}
+            title="Catálogo próprio: disponível, categoria, link interno, destaque, saída"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+        )}
         <Button
           size="icon"
           variant="ghost"

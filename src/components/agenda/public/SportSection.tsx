@@ -23,7 +23,7 @@ export const SportSection = ({ sport, games }: Props) => {
       </h2>
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
         {games.map((g, i) => (
-          <GamePremiumCard key={g.id} game={g} index={i} />
+          <GamePremiumCard key={g.id} game={g} index={i} showActions />
         ))}
       </div>
     </section>

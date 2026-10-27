@@ -35,22 +35,30 @@ const makeGame = (overrides: Partial<DailyGame> = {}): DailyGame => ({
 });
 
 describe("GameCard", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     localStorage.clear();
+    // O teste "ao vivo" abaixo altera os mocks; sem reset, o teste do
+    // sino (Lote 1) herdaria live=true e esconderia sino/ICS.
+    const { isGameCurrentlyLive, getMinutesUntilStart } = await import("@/lib/gameUtils");
+    (isGameCurrentlyLive as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    (getMinutesUntilStart as ReturnType<typeof vi.fn>).mockReturnValue(240);
   });
 
   it("renders football game with both teams and competition", () => {
     render(<GameCard game={makeGame()} index={0} />);
     expect(screen.getByText("Flamengo")).toBeInTheDocument();
     expect(screen.getByText("Palmeiras")).toBeInTheDocument();
-    expect(screen.getByText(/Brasileirão/)).toBeInTheDocument();
+    // Exato (não regex): o chip "Seguir Brasileirão" do Lote 1 também
+    // contém o nome, e não deve contar como o título da competição.
+    expect(screen.getByText("Brasileirão")).toBeInTheDocument();
     expect(screen.getByText("21:00")).toBeInTheDocument();
-    expect(screen.getByText(/futebol/i)).toBeInTheDocument();
+    expect(screen.getByText("Futebol")).toBeInTheDocument();
   });
 
   it("renders sport label for basketball", () => {
     render(<GameCard game={makeGame({ sport_type: "basketball", competition: "NBA" })} index={0} />);
-    expect(screen.getByText(/basquete/i)).toBeInTheDocument();
+    // Exato: o chip "Seguir Basquete" do Lote 1 também contém o nome.
+    expect(screen.getByText("Basquete")).toBeInTheDocument();
   });
 
   it("uses event layout (no vs) for non-adversarial sports like F1", () => {
@@ -71,9 +79,10 @@ describe("GameCard", () => {
     expect(screen.getByText(/ao vivo/i)).toBeInTheDocument();
   });
 
-  it("does NOT render reminder bell button", () => {
+  it("renders reminder bell and ICS button for upcoming games (Lote 1)", () => {
     render(<GameCard game={makeGame()} index={0} />);
-    expect(screen.queryByLabelText(/lembrete/i)).toBeNull();
+    expect(screen.getByLabelText(/me avise 15 min antes/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/adicionar .* à agenda/i)).toBeInTheDocument();
   });
 
   it("shows 'Sem transmissão confirmada' when no channels", () => {

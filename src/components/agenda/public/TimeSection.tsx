@@ -73,7 +73,7 @@ export const TimeSection = ({ games, statusById }: Props) => {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
             {grp.games.map((g, i) => (
-              <GamePremiumCard key={g.id} game={g} index={i} showSport />
+              <GamePremiumCard key={g.id} game={g} index={i} showSport showActions />
             ))}
           </div>
         </section>

@@ -5,6 +5,8 @@ import { useRealtimeMovies } from "@/hooks/useRealtimeMovies";
 import { usePagination } from "@/hooks/usePagination";
 import { ContentListFilters } from "@/components/admin/content/ContentListFilters";
 import { SortableContentRow } from "@/components/admin/content/SortableContentRow";
+import { CatalogFieldsDialog } from "@/components/admin/CatalogFieldsDialog";
+import { normalizeCatalogFields, type CatalogFields } from "@/lib/catalogFields";
 import { sortContent, usePersistedSort } from "@/components/admin/content/contentListUtils";
 
 import {
@@ -67,6 +69,7 @@ const AdminFilmes = () => {
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
   const [searched, setSearched] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<FeaturedMovie | null>(null);
+  const [editingCatalog, setEditingCatalog] = useState<FeaturedMovie | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
@@ -518,6 +521,7 @@ const AdminFilmes = () => {
                         onRefresh={() => handleRefreshOne(m)}
                         onToggle={(v) => toggleMovie.mutate({ id: m.id, active: v })}
                         onDelete={() => setPendingDelete(m)}
+                        onEditCatalog={() => setEditingCatalog(m)}
                       />
                     ))}
                   </div>
@@ -571,6 +575,22 @@ const AdminFilmes = () => {
 
         </div>
       </div>
+
+      {editingCatalog && (
+        <CatalogFieldsDialog
+          open={!!editingCatalog}
+          onOpenChange={(o) => !o && setEditingCatalog(null)}
+          title={editingCatalog.title}
+          initial={normalizeCatalogFields(editingCatalog)}
+          saving={updateMovie.isPending}
+          onSave={(fields: CatalogFields) => {
+            updateMovie.mutate({ id: editingCatalog.id, ...fields }, {
+              onSuccess: () => { toast.success("Catálogo atualizado!"); setEditingCatalog(null); },
+              onError: (e: any) => toast.error(e?.message ?? "Falha ao salvar o catálogo"),
+            });
+          }}
+        />
+      )}
 
       <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
         <AlertDialogContent>

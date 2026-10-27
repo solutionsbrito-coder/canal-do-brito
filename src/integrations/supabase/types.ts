@@ -355,6 +355,11 @@ export type Database = {
           title: string
           tmdb_id: number
           year: number | null
+          available_in_catalog: boolean
+          catalog_category: string | null
+          internal_link: string | null
+          featured: boolean
+          leaves_at: string | null
         }
         Insert: {
           active?: boolean
@@ -370,6 +375,11 @@ export type Database = {
           title: string
           tmdb_id: number
           year?: number | null
+          available_in_catalog?: boolean
+          catalog_category?: string | null
+          internal_link?: string | null
+          featured?: boolean
+          leaves_at?: string | null
         }
         Update: {
           active?: boolean
@@ -385,6 +395,11 @@ export type Database = {
           title?: string
           tmdb_id?: number
           year?: number | null
+          available_in_catalog?: boolean
+          catalog_category?: string | null
+          internal_link?: string | null
+          featured?: boolean
+          leaves_at?: string | null
         }
         Relationships: []
       }
@@ -403,6 +418,11 @@ export type Database = {
           title: string
           tmdb_id: number
           year: number | null
+          available_in_catalog: boolean
+          catalog_category: string | null
+          internal_link: string | null
+          featured: boolean
+          leaves_at: string | null
         }
         Insert: {
           active?: boolean
@@ -418,6 +438,11 @@ export type Database = {
           title: string
           tmdb_id: number
           year?: number | null
+          available_in_catalog?: boolean
+          catalog_category?: string | null
+          internal_link?: string | null
+          featured?: boolean
+          leaves_at?: string | null
         }
         Update: {
           active?: boolean
@@ -433,6 +458,11 @@ export type Database = {
           title?: string
           tmdb_id?: number
           year?: number | null
+          available_in_catalog?: boolean
+          catalog_category?: string | null
+          internal_link?: string | null
+          featured?: boolean
+          leaves_at?: string | null
         }
         Relationships: []
       }

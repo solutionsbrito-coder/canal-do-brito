@@ -1,4 +1,4 @@
-import { Clapperboard, CalendarDays } from "lucide-react";
+import { Clapperboard, CalendarDays, Star } from "lucide-react";
 
 interface BottomNavProps {
   activeTab: string;
@@ -7,6 +7,7 @@ interface BottomNavProps {
 
 const navItems = [
   { id: "schedule", label: "Programação", icon: CalendarDays },
+  { id: "meucanal", label: "Meu Canal", icon: Star },
   { id: "novidades", label: "Filmes e Séries", icon: Clapperboard },
 ];
 

@@ -10,12 +10,13 @@ export function cn(...inputs: ClassValue[]) {
  * Used for sharing on WhatsApp Status so the recipient lands directly
  * on the right view (programação ou filmes e séries).
  */
-export type PublicTab = "schedule" | "novidades";
+export type PublicTab = "schedule" | "novidades" | "meucanal";
 
 /** Pretty path slugs used in shared URLs (WhatsApp Status, etc.). */
 export const TAB_SLUGS: Record<PublicTab, string> = {
   schedule: "programacao",
   novidades: "filmes-e-series",
+  meucanal: "meus-jogos",
 };
 
 /** Reverse lookup: slug → tab id. Includes legacy aliases. */
@@ -32,6 +33,10 @@ export const SLUG_TO_TAB: Record<string, PublicTab> = {
   "filmes": "novidades",
   "series": "novidades",
   "novidades": "novidades",
+  // Meu Canal (Lote 1, sem login)
+  "meus-jogos": "meucanal",
+  "meucanal": "meucanal",
+  "meu-canal": "meucanal",
   "sugestoes": "novidades",    // legacy
   "destaques": "novidades",    // legacy
   "highlights": "novidades",   // legacy
