@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { splitChannels, weekdayPtBr, wrapText } from "@/lib/shareCard";
+import { initialsForTeam, splitChannels, weekdayPtBr, wrapText } from "@/lib/shareCard";
 
 // ctx mínimo: measureText aproxima cada caractere por 10 px.
 const ctx = {
@@ -16,6 +16,12 @@ describe("Lote 2.4 — card de compartilhamento", () => {
   it("chips: separa por • e ignora vazios", () => {
     expect(splitChannels("Premiere • SporTV •  ")).toEqual(["Premiere", "SporTV"]);
     expect(splitChannels("")).toEqual([]);
+  });
+
+  it("distintivo: iniciais de até 3 palavras", () => {
+    expect(initialsForTeam("Portland Trail Blazers")).toBe("PTB");
+    expect(initialsForTeam("Teste A")).toBe("TA");
+    expect(initialsForTeam("Palmeiras")).toBe("P");
   });
 
   it("wrapText: quebra sem estourar a largura", () => {
