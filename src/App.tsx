@@ -61,6 +61,14 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/programacao" element={<Index />} />
+              {/* Lote 2.1: rota explícita para "Meu Canal". Antes, o acesso
+                  direto a /meus-jogos caía no SlugFallback, que
+                  redirecionava para o próprio /meus-jogos sem montar o
+                  Index — página em branco. Via aba funcionava só porque
+                  o Index já estava montado e trocava a aba por
+                  replaceState. Aliases (/meu-canal, /meucanal) continuam
+                  resolvendo via SlugFallback para cá. */}
+              <Route path="/meus-jogos" element={<Index />} />
               <Route path="/filmes-e-series" element={<Index />} />
               <Route path="/agenda" element={<AgendaRedirect />} />
               <Route path="/agenda-esportiva" element={<SchedulePage />} />

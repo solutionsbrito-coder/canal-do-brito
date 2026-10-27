@@ -154,7 +154,25 @@ export const MinhaListaSection = () => {
     return m;
   }, [movies, series]);
 
-  if (items.length === 0) return null;
+  // Lote 2.1: seção visível mesmo vazia. Antes retornava null quando
+  // não havia itens, então o visitante nunca descobria a feature com
+  // o catálogo vazio. Não cria dados nem mostra títulos inexistentes.
+  if (items.length === 0) {
+    return (
+      <section aria-label="Minha lista" className="space-y-3 px-4">
+        <h2 className="font-display text-xl tracking-wide text-foreground">🔖 Minha lista</h2>
+        <p className="text-[11px] text-muted-foreground font-body">
+          Salva só neste dispositivo, sem login. Se trocar de aparelho ou limpar
+          os dados, a lista some.
+        </p>
+        <p className="text-[12px] text-white/60 font-body">
+          Você ainda não salvou nenhum título. Quando houver filmes e séries no
+          catálogo, abra um título e toque em “Quero ver” ou “Já vi” para ele
+          aparecer aqui.
+        </p>
+      </section>
+    );
+  }
   return (
     <section aria-label="Minha lista" className="space-y-3 px-4">
       <h2 className="font-display text-xl tracking-wide text-foreground">🔖 Minha lista</h2>

@@ -535,6 +535,58 @@ const ProgramacaoTab = () => {
 
       {isLoading && <AgendaSkeleton />}
 
+      {/* Filtros ativos (Lote 2.1): fora do bloco `total > 0`, para
+          aparecerem também com a agenda vazia. Antes, chips e botão
+          de copiar link só renderizavam quando havia jogos, então um
+          link como ?time=Palmeiras com 0 jogos não mostrava filtro
+          nenhum. Não duplica: o bloco antigo dentro de `total > 0`
+          foi removido. */}
+      {!isLoading && (team || competition || filter !== "all") && (
+        <div className="flex flex-wrap items-center gap-2 mb-4" aria-label="Filtros do link">
+          {filter !== "all" && (
+            <button
+              type="button"
+              onClick={() => setFilter("all")}
+              aria-label={`Remover filtro de esporte ${filter === "live" ? "Ao vivo" : SPORT_LABEL[filter as keyof typeof SPORT_LABEL] ?? filter}`}
+              className="inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-full text-[11px] font-bold bg-primary/15 text-primary border border-primary/30 active:scale-95 transition"
+            >
+              Esporte: {filter === "live" ? "Ao vivo" : SPORT_LABEL[filter as keyof typeof SPORT_LABEL] ?? filter} ✕
+            </button>
+          )}
+          {team && (
+            <button
+              type="button"
+              onClick={() => setTeam("")}
+              aria-label={`Remover filtro de time ${team}`}
+              className="inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-full text-[11px] font-bold bg-primary/15 text-primary border border-primary/30 active:scale-95 transition"
+            >
+              Time: {team} ✕
+            </button>
+          )}
+          {competition && (
+            <button
+              type="button"
+              onClick={() => setCompetition("")}
+              aria-label={`Remover filtro de competição ${competition}`}
+              className="inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-full text-[11px] font-bold bg-primary/15 text-primary border border-primary/30 active:scale-95 transition"
+            >
+              Competição: {competition} ✕
+            </button>
+          )}
+        </div>
+      )}
+      {!isLoading && hasActiveFilters && (
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={copyFilteredLink}
+            className="inline-flex items-center gap-1.5 min-h-[36px] px-4 rounded-full text-[11px] font-bold bg-white/[0.06] text-white/80 border border-white/10 hover:bg-white/10 active:scale-95 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+          >
+            🔗 Copiar link filtrado
+          </button>
+        </div>
+      )}
+
       {!isLoading && total === 0 && (
         <EmptyDayState
           isToday={isToday}
@@ -608,43 +660,6 @@ const ProgramacaoTab = () => {
             channel={channel}
             onChannel={setChannel}
           />
-
-          {/* Filtros vindos da URL (?time= / ?competicao=) + copiar link filtrado (Lote 2) */}
-          {(team || competition) && (
-            <div className="flex flex-wrap items-center gap-2 mb-4" aria-label="Filtros do link">
-              {team && (
-                <button
-                  type="button"
-                  onClick={() => setTeam("")}
-                  aria-label={`Remover filtro de time ${team}`}
-                  className="inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-full text-[11px] font-bold bg-primary/15 text-primary border border-primary/30 active:scale-95 transition"
-                >
-                  Time: {team} ✕
-                </button>
-              )}
-              {competition && (
-                <button
-                  type="button"
-                  onClick={() => setCompetition("")}
-                  aria-label={`Remover filtro de competição ${competition}`}
-                  className="inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-full text-[11px] font-bold bg-primary/15 text-primary border border-primary/30 active:scale-95 transition"
-                >
-                  Competição: {competition} ✕
-                </button>
-              )}
-            </div>
-          )}
-          {hasActiveFilters && (
-            <div className="mb-4">
-              <button
-                type="button"
-                onClick={copyFilteredLink}
-                className="inline-flex items-center gap-1.5 min-h-[36px] px-4 rounded-full text-[11px] font-bold bg-white/[0.06] text-white/80 border border-white/10 hover:bg-white/10 active:scale-95 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-              >
-                🔗 Copiar link filtrado
-              </button>
-            </div>
-          )}
 
           {(sportsSorted.length > 1 || filter !== "all") && (
             <SportFilterBar
