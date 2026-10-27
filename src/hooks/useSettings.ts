@@ -15,6 +15,8 @@ export const useSettings = () =>
     },
   });
 
+import { isSecretSettingKey } from "@/lib/settingsSecret";
+
 export const useUpdateSetting = () => {
   const qc = useQueryClient();
   return useMutation({
@@ -29,7 +31,9 @@ export const useUpdateSetting = () => {
         const { error } = await supabase.from("settings").update({ value }).eq("key", key);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("settings").insert({ key, value });
+        const { error } = await supabase
+          .from("settings")
+          .insert({ key, value, is_secret: isSecretSettingKey(key) });
         if (error) throw error;
       }
     },
