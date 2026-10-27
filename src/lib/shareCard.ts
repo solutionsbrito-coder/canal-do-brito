@@ -1,13 +1,22 @@
 /**
- * Compartilhar como imagem (Lote 2) — card gerado NO CLIENTE, via
- * <canvas>, sem nenhuma dependência nova e sem enviar nada a servidor
- * algum. Por isso o card é tipográfico (fundo, texto e CTA): desenhar
- * a capa do TMDB no canvas exigiria baixar a imagem e a tornaria
- * "tainted" (CORS), o que impediria exportar o PNG. Nada de link
- * externo aqui: o CTA é sempre "Assistir no Canal do Brito".
+ * Compartilhar como imagem (Lote 2, redesenhado no Lote 2.4) — card
+ * gerado NO CLIENTE, via <canvas>, sem nenhuma dependência nova e
+ * sem enviar nada a servidor algum. Por isso o card é tipográfico
+ * (fundo, texto e CTA): desenhar a capa do TMDB no canvas exigiria
+ * baixar a imagem e a tornaria "tainted" (CORS), o que impediria
+ * exportar o PNG. Nada de link externo aqui: o CTA é sempre
+ * "Assistir no Canal do Brito".
  *
  * Formato 1080×1350 (retrato, bom para WhatsApp e Instagram).
  * Horários sempre em Brasília, como o resto do app.
+ *
+ * Desenho (Lote 2.4): o card antigo empilhava tudo no terço
+ * superior e deixava ~600 px de preto vazio embaixo, em Arial
+ * genérica — cara de rascunho. O novo usa as fontes da marca
+ * (Bebas Neue nos títulos, Syne nos textos, as mesmas carregadas
+ * pela página), confronto em dois blocos com selo "VS" no meio,
+ * selo de data, horário em destaque, canais em chips e rodapé
+ * ancorado embaixo, ocupando a altura inteira sem vazio.
  */
 
 export interface ShareGameInput {
@@ -29,11 +38,21 @@ export interface ShareTitleInput {
 
 const W = 1080;
 const H = 1350;
-const BG = "#07080a";
+const BG_TOP = "#0b1510";
+const BG_BOTTOM = "#07080a";
 const GREEN = "#00ff87";
+const GREEN_DARK = "#00c96a";
 const WHITE = "#ffffff";
-const MUTED = "rgba(255,255,255,0.65)";
-const FAINT = "rgba(255,255,255,0.35)";
+const MUTED = "rgba(255,255,255,0.70)";
+const FAINT = "rgba(255,255,255,0.40)";
+const CARD = "rgba(255,255,255,0.05)";
+const CARD_LINE = "rgba(255,255,255,0.14)";
+
+// Bebas Neue (títulos) e Syne (textos) são as fontes da marca,
+// carregadas pela página; o canvas usa a fonte já carregada e cai
+// para Arial/sans-serif se ela ainda não estiver disponível.
+const DISPLAY = "'Bebas Neue', 'Arial Narrow', Arial, sans-serif";
+const BODY = "'Syne', Arial, sans-serif";
 
 function canvas(): [HTMLCanvasElement, CanvasRenderingContext2D] {
   const c = document.createElement("canvas");
@@ -66,40 +85,22 @@ export function wrapText(
   return lines;
 }
 
-function paintBase(ctx: CanvasRenderingContext2D, eyebrow: string) {
-  ctx.fillStyle = BG;
-  ctx.fillRect(0, 0, W, H);
-  // Faixa verde superior + brilho sutil.
-  ctx.fillStyle = GREEN;
-  ctx.fillRect(0, 0, W, 14);
-  const glow = ctx.createRadialGradient(540, 180, 40, 540, 180, 620);
-  glow.addColorStop(0, "rgba(0,255,135,0.16)");
-  glow.addColorStop(1, "rgba(0,255,135,0)");
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, W, 700);
-  ctx.textAlign = "center";
-  ctx.fillStyle = GREEN;
-  ctx.font = "700 34px Arial, sans-serif";
-  ctx.fillText("CANAL DO BRITO", 540, 110);
-  ctx.fillStyle = FAINT;
-  ctx.font = "400 26px Arial, sans-serif";
-  ctx.fillText(eyebrow.toUpperCase(), 540, 160);
+/** Dia da semana em pt-BR para uma data "YYYY-MM-DD". Exportado p/ teste. */
+export function weekdayPtBr(date: string): string {
+  const [y, m, d] = date.split("-").map(Number);
+  if (!y || !m || !d) return "";
+  const days = [
+    "domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado",
+  ];
+  return days[new Date(Date.UTC(y, m - 1, d)).getUTCDay()] ?? "";
 }
 
-function paintCta(ctx: CanvasRenderingContext2D, y: number) {
-  // Pílula do CTA (texto, não link — a imagem em si não clica).
-  const label = "▶  Assistir no Canal do Brito";
-  ctx.font = "700 36px Arial, sans-serif";
-  const tw = ctx.measureText(label).width + 90;
-  const x = (W - tw) / 2;
-  ctx.fillStyle = GREEN;
-  roundRect(ctx, x, y, tw, 88, 44);
-  ctx.fill();
-  ctx.fillStyle = "#07080a";
-  ctx.fillText(label, 540, y + 56);
-  ctx.fillStyle = MUTED;
-  ctx.font = "400 28px Arial, sans-serif";
-  ctx.fillText("canaldobrito.site", 540, y + 150);
+/** Separa "A • B • C" em itens de chip. Exportado p/ teste. */
+export function splitChannels(channelsText: string): string[] {
+  return channelsText
+    .split(/[•|]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 function roundRect(
@@ -119,17 +120,179 @@ function roundRect(
   ctx.closePath();
 }
 
-function paintMetaLine(
+/** Mede o texto com a fonte atual e encolhe até caber em maxLines. */
+function fitLines(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  maxLines: number,
+  startSize: number,
+  minSize: number,
+  font: string,
+): { lines: string[]; size: number } {
+  let size = startSize;
+  let lines: string[] = [];
+  do {
+    ctx.font = `${font} ${size}px ${DISPLAY}`;
+    lines = wrapText(ctx, text, maxWidth).slice(0, maxLines);
+    size -= 6;
+  } while (lines.join(" ").length < text.length && size > minSize);
+  ctx.font = `${font} ${size + 6}px ${DISPLAY}`;
+  lines = wrapText(ctx, text, maxWidth).slice(0, maxLines);
+  return { lines, size: size + 6 };
+}
+
+function paintBase(ctx: CanvasRenderingContext2D, eyebrow: string) {
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, BG_TOP);
+  bg.addColorStop(0.55, BG_BOTTOM);
+  bg.addColorStop(1, "#040505");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+  // Brilho verde no topo + moldura verde fina em cima e embaixo.
+  const glow = ctx.createRadialGradient(540, 120, 40, 540, 120, 700);
+  glow.addColorStop(0, "rgba(0,255,135,0.20)");
+  glow.addColorStop(1, "rgba(0,255,135,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, 760);
+  ctx.fillStyle = GREEN;
+  ctx.fillRect(0, 0, W, 10);
+  ctx.fillRect(0, H - 10, W, 10);
+  // Marca no topo, com traços laterais.
+  ctx.textAlign = "center";
+  ctx.fillStyle = GREEN;
+  ctx.font = `700 36px ${BODY}`;
+  ctx.fillText("CANAL DO BRITO", 540, 92);
+  ctx.fillStyle = CARD_LINE;
+  ctx.fillRect(120, 122, 260, 2);
+  ctx.fillRect(700, 122, 260, 2);
+  ctx.fillStyle = FAINT;
+  ctx.font = `700 26px ${BODY}`;
+  ctx.fillText(eyebrow.toUpperCase(), 540, 132);
+}
+
+/** Selo de data centralizado; retorna a altura ocupada. */
+function paintDateBadge(ctx: CanvasRenderingContext2D, date: string, y: number): number {
+  const weekday = weekdayPtBr(date);
+  const label = weekday
+    ? `${weekday.toUpperCase()} · ${formatDatePtBr(date).toUpperCase()}`
+    : formatDatePtBr(date).toUpperCase();
+  ctx.font = `700 28px ${BODY}`;
+  const tw = ctx.measureText(label).width + 72;
+  const x = (W - tw) / 2;
+  ctx.fillStyle = "rgba(0,255,135,0.12)";
+  roundRect(ctx, x, y, tw, 56, 28);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(0,255,135,0.55)";
+  ctx.lineWidth = 2;
+  roundRect(ctx, x, y, tw, 56, 28);
+  ctx.stroke();
+  ctx.fillStyle = GREEN;
+  ctx.fillText(label, 540, y + 37);
+  return 56;
+}
+
+/** Um bloco de time (até 2 linhas, Bebas grande). Retorna a altura. */
+function paintTeam(ctx: CanvasRenderingContext2D, name: string, y: number): number {
+  const { lines, size } = fitLines(ctx, name.toUpperCase(), 880, 2, 128, 72, "400");
+  ctx.fillStyle = WHITE;
+  ctx.textAlign = "center";
+  let cursor = y;
+  lines.forEach((line) => {
+    ctx.fillText(line, 540, cursor);
+    cursor += size + 14;
+  });
+  return cursor - y;
+}
+
+/** Selo "VS" circular entre os dois times. */
+function paintVs(ctx: CanvasRenderingContext2D, cy: number) {
+  ctx.beginPath();
+  ctx.arc(540, cy, 46, 0, Math.PI * 2);
+  ctx.fillStyle = GREEN;
+  ctx.fill();
+  ctx.fillStyle = "#07080a";
+  ctx.font = `400 44px ${DISPLAY}`;
+  ctx.textAlign = "center";
+  ctx.fillText("VS", 540, cy + 16);
+}
+
+/** Linhas de texto centralizadas; retorna a altura ocupada. */
+function paintCentered(
   ctx: CanvasRenderingContext2D,
   text: string,
   y: number,
-  bold = false,
-) {
-  ctx.fillStyle = bold ? WHITE : MUTED;
-  ctx.font = `${bold ? "700" : "400"} 34px Arial, sans-serif`;
-  const lines = wrapText(ctx, text, 880);
-  lines.forEach((line, i) => ctx.fillText(line, 540, y + i * 48));
-  return y + lines.length * 48;
+  font: string,
+  color: string,
+  lineHeight: number,
+  maxWidth = 880,
+): number {
+  ctx.fillStyle = color;
+  ctx.font = font;
+  ctx.textAlign = "center";
+  const lines = wrapText(ctx, text, maxWidth);
+  lines.forEach((line, i) => ctx.fillText(line, 540, y + i * lineHeight));
+  return lines.length * lineHeight;
+}
+
+/** Chips de canais em linhas centralizadas; retorna a altura. */
+function paintChannelChips(ctx: CanvasRenderingContext2D, channelsText: string, y: number): number {
+  const items = splitChannels(channelsText);
+  if (items.length === 0) return 0;
+  ctx.font = `700 26px ${BODY}`;
+  // Empacota os chips em linhas de no máximo 880 px.
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let rowW = 0;
+  for (const item of items) {
+    const w = ctx.measureText(item).width + 48;
+    if (row.length > 0 && rowW + 16 + w > 880) {
+      rows.push(row);
+      row = [];
+      rowW = 0;
+    }
+    row.push(item);
+    rowW += (row.length > 1 ? 16 : 0) + w;
+  }
+  if (row.length > 0) rows.push(row);
+  let cursor = y;
+  for (const r of rows) {
+    const widths = r.map((item) => ctx.measureText(item).width + 48);
+    const total = widths.reduce((a, b) => a + b, 0) + 16 * (r.length - 1);
+    let x = (W - total) / 2;
+    r.forEach((item, i) => {
+      ctx.fillStyle = CARD;
+      roundRect(ctx, x, cursor, widths[i], 52, 26);
+      ctx.fill();
+      ctx.strokeStyle = CARD_LINE;
+      ctx.lineWidth = 1.5;
+      roundRect(ctx, x, cursor, widths[i], 52, 26);
+      ctx.stroke();
+      ctx.fillStyle = MUTED;
+      ctx.fillText(item, x + widths[i] / 2, cursor + 35);
+      x += widths[i] + 16;
+    });
+    cursor += 68;
+  }
+  return cursor - y;
+}
+
+/** Rodapé ancorado: CTA + site, sempre na mesma posição. */
+function paintFooter(ctx: CanvasRenderingContext2D) {
+  const label = "▶  Assistir no Canal do Brito";
+  ctx.font = `700 36px ${BODY}`;
+  const tw = Math.min(880, ctx.measureText(label).width + 96);
+  const x = (W - tw) / 2;
+  const y = 1140;
+  ctx.fillStyle = GREEN;
+  roundRect(ctx, x, y, tw, 92, 46);
+  ctx.fill();
+  ctx.fillStyle = "#07080a";
+  ctx.textAlign = "center";
+  ctx.fillText(label, 540, y + 58);
+  ctx.fillStyle = MUTED;
+  ctx.font = `400 28px ${BODY}`;
+  ctx.fillText("canaldobrito.site", 540, y + 158);
 }
 
 function formatDatePtBr(date: string): string {
@@ -155,36 +318,34 @@ function toBlob(c: HTMLCanvasElement): Promise<Blob> {
 export async function renderGameSharePng(game: ShareGameInput): Promise<Blob> {
   const [c, ctx] = canvas();
   paintBase(ctx, "Agenda esportiva");
-  const matchup = game.away_team
-    ? `${game.home_team} × ${game.away_team}`
-    : game.home_team;
-  ctx.fillStyle = WHITE;
-  ctx.textAlign = "center";
-  // Encolhe a fonte até o confronto caber em no máximo 4 linhas.
-  let size = 96;
-  let lines: string[] = [];
-  do {
-    ctx.font = `800 ${size}px Arial, sans-serif`;
-    lines = wrapText(ctx, matchup, 880).slice(0, 4);
-    size -= 8;
-  } while (lines.join(" ").length < matchup.length && size > 56);
-  ctx.font = `800 ${size + 8}px Arial, sans-serif`;
-  lines = wrapText(ctx, matchup, 880).slice(0, 4);
-  let y = 330;
-  lines.forEach((line) => {
-    ctx.fillText(line, 540, y);
-    y += size + 24;
-  });
-  y += 40;
-  y = paintMetaLine(ctx, `${formatDatePtBr(game.date)} · ${game.game_time.slice(0, 5)} · Horário de Brasília`, y, true);
-  y += 24;
-  y = paintMetaLine(ctx, game.competition, y);
-  y += 24;
-  if (game.channelsText.trim()) {
-    y = paintMetaLine(ctx, `Onde assistir: ${game.channelsText}`, y);
-    y += 24;
+  let y = 190;
+  y += paintDateBadge(ctx, game.date, y) + 44;
+  // Confronto em dois blocos com selo VS — o formato de pôster
+  // esportivo, em vez de uma linha única "A × B".
+  if (game.away_team) {
+    y += paintTeam(ctx, game.home_team, y);
+    const vsY = y + 52;
+    paintVs(ctx, vsY);
+    y = vsY + 52;
+    y += paintTeam(ctx, game.away_team, y);
+  } else {
+    y += paintTeam(ctx, game.home_team, y);
   }
-  paintCta(ctx, Math.min(y + 60, 1080));
+  y += 36;
+  // Horário em destaque, verde, Bebas grande.
+  ctx.fillStyle = GREEN;
+  ctx.font = `400 104px ${DISPLAY}`;
+  ctx.textAlign = "center";
+  ctx.fillText(game.game_time.slice(0, 5), 540, y + 88);
+  y += 88 + 12;
+  y += paintCentered(ctx, "HORÁRIO DE BRASÍLIA", y, `700 24px ${BODY}`, FAINT, 32) + 20;
+  y += paintCentered(ctx, game.competition.toUpperCase(), y, `700 34px ${BODY}`, WHITE, 46) + 20;
+  if (game.channelsText.trim()) {
+    y += paintCentered(ctx, "ONDE ASSISTIR", y, `700 24px ${BODY}`, FAINT, 32) + 14;
+    y += paintChannelChips(ctx, game.channelsText, y);
+  }
+  void y; // o rodapé é ancorado, não segue o fluxo
+  paintFooter(ctx);
   return toBlob(c);
 }
 
@@ -192,23 +353,6 @@ export async function renderGameSharePng(game: ShareGameInput): Promise<Blob> {
 export async function renderTitleSharePng(title: ShareTitleInput): Promise<Blob> {
   const [c, ctx] = canvas();
   paintBase(ctx, title.kind === "series" ? "Série" : "Filme");
-  ctx.fillStyle = WHITE;
-  ctx.textAlign = "center";
-  let size = 96;
-  let lines: string[] = [];
-  do {
-    ctx.font = `800 ${size}px Arial, sans-serif`;
-    lines = wrapText(ctx, title.title, 880).slice(0, 4);
-    size -= 8;
-  } while (lines.join(" ").length < title.title.length && size > 56);
-  ctx.font = `800 ${size + 8}px Arial, sans-serif`;
-  lines = wrapText(ctx, title.title, 880).slice(0, 4);
-  let y = 330;
-  lines.forEach((line) => {
-    ctx.fillText(line, 540, y);
-    y += size + 24;
-  });
-  y += 40;
   const meta = [
     title.year ? String(title.year) : null,
     title.genre?.split(",")[0]?.trim() || null,
@@ -216,11 +360,20 @@ export async function renderTitleSharePng(title: ShareTitleInput): Promise<Blob>
   ]
     .filter(Boolean)
     .join(" · ");
+  // Centraliza o bloco título+meta entre o cabeçalho e o rodapé,
+  // para o card de título não ficar com o miolo vazio como o antigo.
+  const team = fitLines(ctx, title.title.toUpperCase(), 880, 2, 128, 72, "400");
+  const teamH = team.lines.length * (team.size + 14);
+  ctx.font = `700 32px ${BODY}`;
+  const metaLines = meta ? wrapText(ctx, meta.toUpperCase(), 880).length : 0;
+  const blockH = teamH + 44 + (meta ? metaLines * 44 + 20 : 0);
+  let y = 190 + Math.max(0, (1140 - 190 - blockH) / 2);
+  y += paintTeam(ctx, title.title, y) + 44;
   if (meta) {
-    y = paintMetaLine(ctx, meta, y, true);
-    y += 24;
+    y += paintCentered(ctx, meta.toUpperCase(), y, `700 32px ${BODY}`, MUTED, 44) + 20;
   }
-  paintCta(ctx, Math.min(y + 60, 1080));
+  void y;
+  paintFooter(ctx);
   return toBlob(c);
 }
 
