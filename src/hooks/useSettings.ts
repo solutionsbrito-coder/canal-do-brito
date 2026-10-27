@@ -28,7 +28,14 @@ export const useUpdateSetting = () => {
         .maybeSingle();
 
       if (existing) {
-        const { error } = await supabase.from("settings").update({ value }).eq("key", key);
+        // A seed antiga já criou tmdb_api_key com is_secret=false; o
+        // trigger também valida UPDATE, então o update precisa corrigir
+        // o flag junto com o valor, senão o erro persiste mesmo com o
+        // insert corrigido.
+        const { error } = await supabase
+          .from("settings")
+          .update({ value, is_secret: isSecretSettingKey(key) })
+          .eq("key", key);
         if (error) throw error;
       } else {
         const { error } = await supabase
