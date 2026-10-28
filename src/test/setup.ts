@@ -23,9 +23,12 @@ vi.mock("@/hooks/useWatchProgress", () => ({
 vi.mock("@/hooks/usePushSubscription", () => ({
   usePushSubscription: () => ({
     permission: "default" as NotificationPermission,
+    refreshPermission: () => "default" as NotificationPermission,
     subscription: null,
     subscribe: async () => null,
+    subscribeDevice: async () => ({ ok: true as const }),
     addGameReminder: async () => true,
+    addGameReminderWithReason: async () => ({ ok: true as const }),
     removeGameReminder: async () => true,
     isSupported: true,
   }),

@@ -6,6 +6,7 @@ import { hasAnyFollow, matchesFollowed } from "@/lib/meuCanal";
 import { getLocalDateString, SPORT_LABEL, type SportType } from "@/lib/gameUtils";
 import { detectedSport } from "@/components/agenda/public/highlightsCuration";
 import { GamePremiumCard } from "@/components/agenda/public/GamePremiumCard";
+import { GlobalNotificationToggle } from "@/components/public/GlobalNotificationToggle";
 import { offsetDateStr } from "@/lib/whatsappText";
 import { Button } from "@/components/ui/button";
 
@@ -85,6 +86,13 @@ const MeusJogosTab = () => {
       <p className="text-[11px] text-white/45 mt-1">
         Se trocar de aparelho ou limpar os dados do navegador, os follows somem — basta seguir de novo.
       </p>
+
+      {/* Botão global de notificações: fica aqui (e não só no sino de
+          um jogo) porque Meu Canal é o espaço pessoal do visitante,
+          sem login, no mesmo modelo da inscrição push — do aparelho,
+          não de uma conta. Visível mesmo sem follows, para o leigo
+          liberar uma única vez antes de procurar um jogo. */}
+      <GlobalNotificationToggle />
 
       {/* O que sigo */}
       {following && (

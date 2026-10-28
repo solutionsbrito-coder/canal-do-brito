@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bell, BellRing, CalendarPlus, Check, Plus } from "lucide-react";
+import { Bell, BellRing, CalendarPlus, Check, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import type { DailyGame } from "@/hooks/useDailyGames";
 import { usePushSubscription } from "@/hooks/usePushSubscription";
@@ -9,6 +9,10 @@ import { isCompetitionFollowed, isSportFollowed, isTeamFollowed } from "@/lib/me
 import { getMinutesUntilStart, isGameCurrentlyLive, SPORT_LABEL, type SportType } from "@/lib/gameUtils";
 import { detectedSport } from "@/components/agenda/public/highlightsCuration";
 import { downloadGameIcs } from "@/lib/ics";
+import {
+  NotificationPermissionDialogs,
+  type NotificationDialogKind,
+} from "@/components/public/NotificationPermissionDialogs";
 import { renderGameSharePng } from "@/lib/shareCard";
 import { ShareCardButton } from "@/components/public/ShareCardButton";
 
@@ -30,12 +34,33 @@ interface GameActionsProps {
  *
  * Sino e ICS aparecem só para jogos que ainda vão começar. Jogos ao
  * vivo ou encerrados não têm o que lembrar/adicionar.
+ *
+ * Ajuda de permissão do sino (não voltar ao erro genérico):
+ * - Permissão "default": antes do pedido do sistema, um aviso do
+ *   próprio site explica o que vai acontecer, para o visitante não
+ *   negar no susto. Só o botão "Permitir" do aviso chama o pedido.
+ * - Permissão "denied": o sistema não pergunta outra vez, então o
+ *   sino NÃO chama requestPermission de novo — abre o diálogo de
+ *   ajuda com o passo a passo do contexto (PWA Android, Chrome,
+ *   iPhone ou outro), botão "Tentar de novo" (releitura da permissão)
+ *   e a alternativa .ics, que não precisa de permissão.
+ * - Outras causas (sem VAPID, sem suporte, erro de inscrição ou de
+ *   banco) têm mensagens próprias e honestas — nunca "verifique se
+ *   as notificações estão liberadas" quando a permissão não é o
+ *   problema.
  */
 export const GameActions = ({ game, showFollow = true }: GameActionsProps) => {
-  const { addGameReminder, removeGameReminder, isSupported: pushSupported } = usePushSubscription();
+  const {
+    addGameReminderWithReason,
+    removeGameReminder,
+    isSupported: pushSupported,
+    permission,
+    refreshPermission,
+  } = usePushSubscription();
   const { reminded, markReminded, unmarkReminded } = useRemindedGames();
   const { prefs, toggleTeam, toggleSport, toggleCompetition } = useMeuCanal();
   const [busy, setBusy] = useState(false);
+  const [dialog, setDialog] = useState<NotificationDialogKind | null>(null);
 
   const sport = detectedSport(game);
   const minutesUntil = getMinutesUntilStart(game.game_time, game.date);
@@ -43,30 +68,70 @@ export const GameActions = ({ game, showFollow = true }: GameActionsProps) => {
   const upcoming = !live && minutesUntil !== null && minutesUntil > 0;
   const isReminded = reminded.has(game.id);
 
+  const attemptReminder = async () => {
+    setBusy(true);
+    try {
+      const result = await addGameReminderWithReason(game.id);
+      if (result.ok) {
+        markReminded(game.id);
+        toast.success("Você será avisado 15 min antes!");
+      } else if (result.reason === "permission-denied") {
+        setDialog("help-denied");
+      } else if (result.reason === "no-vapid") {
+        toast.error("Lembretes indisponíveis no momento (configuração do site). Use “Adicionar à agenda”.");
+      } else if (result.reason === "unsupported") {
+        toast.error("Este navegador não suporta notificações push. Use a agenda (.ics) abaixo.");
+      } else if (result.reason === "subscribe-error") {
+        toast.error("Não foi possível concluir a inscrição de notificações. Tente de novo.");
+      } else {
+        toast.error("Não foi possível salvar o lembrete. Tente de novo em instantes.");
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleBell = async () => {
     if (busy) return;
     if (!pushSupported) {
       toast.error("Este navegador não suporta notificações push. Use a agenda (.ics) abaixo.");
       return;
     }
-    setBusy(true);
-    try {
-      if (isReminded) {
+    // Releitura fresca: o visitante pode ter liberado a permissão
+    // nas configurações do aparelho desde a última visita.
+    const current = refreshPermission ? refreshPermission() : permission;
+    if (isReminded) {
+      setBusy(true);
+      try {
         await removeGameReminder(game.id);
         unmarkReminded(game.id);
         toast.info("Lembrete removido.");
-      } else {
-        const ok = await addGameReminder(game.id);
-        if (!ok) {
-          toast.error("Não foi possível ativar o lembrete. Verifique se as notificações estão liberadas.");
-          return;
-        }
-        markReminded(game.id);
-        toast.success("Você será avisado 15 min antes!");
+      } finally {
+        setBusy(false);
       }
-    } finally {
-      setBusy(false);
+      return;
     }
+    if (current === "denied") {
+      // Não pedir de novo: o sistema não pergunta outra vez.
+      setDialog("help-denied");
+      return;
+    }
+    if (current === "default") {
+      setDialog("pre-permission");
+      return;
+    }
+    await attemptReminder();
+  };
+
+  const handleRetryFromHelp = async () => {
+    const current = refreshPermission ? refreshPermission() : permission;
+    if (current === "granted") {
+      setDialog(null);
+      await attemptReminder();
+    } else if (current === "default") {
+      setDialog("pre-permission");
+    }
+    // Ainda "denied": o diálogo fica aberto com o passo a passo.
   };
 
   const followTargets: { label: string; followed: boolean; toggle: () => void }[] = [];
@@ -160,6 +225,28 @@ export const GameActions = ({ game, showFollow = true }: GameActionsProps) => {
         </button>
       ))}
       {!upcoming && !showFollow && null}
+
+      <NotificationPermissionDialogs
+        dialog={dialog}
+        onClose={() => setDialog(null)}
+        onConfirmPrePermission={async () => {
+          setDialog(null);
+          await attemptReminder();
+        }}
+        onRetryFromHelp={handleRetryFromHelp}
+        helpFooter={
+          <button
+            type="button"
+            onClick={() => {
+              downloadGameIcs(game);
+              setDialog(null);
+            }}
+            className="inline-flex min-h-[44px] items-center justify-center rounded-full border border-white/15 px-4 text-sm font-bold text-white/80 hover:bg-white/10 transition active:scale-95"
+          >
+            Adicionar à agenda (.ics)
+          </button>
+        }
+      />
     </div>
   );
 };
