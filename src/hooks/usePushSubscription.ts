@@ -15,11 +15,15 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 async function syncKeysToDb(sub: PushSubscription) {
   const json = sub.toJSON();
   const keys = json.keys as { p256dh: string; auth: string };
-  await supabase.rpc("upsert_push_subscription", {
+  // O erro do RPC precisa rejeitar aqui: antes, um upsert falho
+  // resolvia em silêncio e o sino passava a usar um endpoint que
+  // não existe no banco (A2 da auditoria de push).
+  const { error } = await supabase.rpc("upsert_push_subscription", {
     _endpoint: sub.endpoint,
     _p256dh: keys.p256dh,
     _auth: keys.auth,
   });
+  if (error) throw error;
 }
 
 /**
@@ -61,16 +65,27 @@ export function usePushSubscription() {
 
   const vapidPublicKey = settings?.vapid_public_key;
 
-  // On mount: check existing subscription via the unified SW and re-sync keys
+  // On mount: check existing subscription via the unified SW and re-sync keys.
+  // A2 da auditoria de push: se o sync falhar, a inscrição NÃO fica no
+  // estado como se fosse válida — antes, o catch vazio deixava o sino
+  // usar um endpoint que não existe no banco, e o RPC de vínculo
+  // voltava "sem erro" sem gravar nada. Com o estado zerado, o toque
+  // no sino passa pelo caminho completo de inscrição (que sincroniza
+  // e reporta erro de verdade) em vez de usar o endpoint fantasma.
   useEffect(() => {
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
 
     navigator.serviceWorker.ready.then(async (reg) => {
       const sub = await reg.pushManager.getSubscription();
       if (sub) {
-        setSubscription(sub);
-        // Always re-sync keys in case browser rotated them
-        syncKeysToDb(sub).catch(() => {});
+        try {
+          // Always re-sync keys in case browser rotated them
+          await syncKeysToDb(sub);
+          setSubscription(sub);
+        } catch (err) {
+          console.error("Push sync error:", err);
+          setSubscription(null);
+        }
       }
     });
   }, []);
@@ -181,8 +196,28 @@ export function usePushSubscription() {
     return null;
   }, [subscribeDetailed]);
 
+  // A1 da auditoria de push: o RPC agora retorna boolean — true
+  // somente se o vínculo existe após a operação. Um "false" (endpoint
+  // divergente, inscrição nunca sincronizada) NÃO é sucesso: o sino
+  // não pode acender. Nesse caso, re-sincroniza a inscrição pelo
+  // caminho completo (subscribeDetailed, que faz o upsert) e tenta
+  // o RPC mais uma vez; se continuar false, é falha de banco.
   const addGameReminderWithReason = useCallback(
     async (gameId: string): Promise<AddReminderResult> => {
+      const callRpc = async (
+        endpoint: string
+      ): Promise<{ ok: boolean; linked: boolean }> => {
+        const { data, error } = await supabase.rpc("add_push_game_id", {
+          _endpoint: endpoint,
+          _game_id: gameId,
+        });
+        if (error) {
+          console.error("addGameReminder error:", error);
+          return { ok: false, linked: false };
+        }
+        return { ok: true, linked: data === true };
+      };
+
       let sub = subscription;
       if (!sub) {
         const result = await subscribeDetailed();
@@ -190,13 +225,14 @@ export function usePushSubscription() {
         sub = result.sub;
       }
 
-      const { error } = await supabase.rpc("add_push_game_id", {
-        _endpoint: sub.endpoint,
-        _game_id: gameId,
-      });
+      const first = await callRpc(sub.endpoint);
+      if (!first.ok) return { ok: false, reason: "rpc-error" };
+      if (first.linked) return { ok: true };
 
-      if (error) {
-        console.error("addGameReminder error:", error);
+      const retry = await subscribeDetailed();
+      if (!retry.ok) return retry;
+      const second = await callRpc(retry.sub.endpoint);
+      if (!second.ok || !second.linked) {
         return { ok: false, reason: "rpc-error" };
       }
       return { ok: true };
@@ -212,11 +248,15 @@ export function usePushSubscription() {
     [addGameReminderWithReason]
   );
 
+  // A3 da auditoria de push: espelho do A1 para remover — o RPC
+  // retorna boolean, e só true confirma a remoção. False (endpoint
+  // divergente) ou erro mantém o sino marcado: desmarcar sem
+  // confirmação seria o mesmo "sucesso falso" do acender.
   const removeGameReminder = useCallback(
     async (gameId: string) => {
       if (!subscription) return false;
 
-      const { error } = await supabase.rpc("remove_push_game_id", {
+      const { data, error } = await supabase.rpc("remove_push_game_id", {
         _endpoint: subscription.endpoint,
         _game_id: gameId,
       });
@@ -225,7 +265,7 @@ export function usePushSubscription() {
         console.error("removeGameReminder error:", error);
         return false;
       }
-      return true;
+      return data === true;
     },
     [subscription]
   );

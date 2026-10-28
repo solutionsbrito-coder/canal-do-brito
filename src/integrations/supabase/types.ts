@@ -831,7 +831,7 @@ export type Database = {
       activate_scheduled_content: { Args: never; Returns: undefined }
       add_push_game_id: {
         Args: { _endpoint: string; _game_id: string }
-        Returns: undefined
+        Returns: boolean
       }
       check_alias_collision: {
         Args: { _alias: string; _exclude_mapping_id?: string }
@@ -861,7 +861,7 @@ export type Database = {
       }
       remove_push_game_id: {
         Args: { _endpoint: string; _game_id: string }
-        Returns: undefined
+        Returns: boolean
       }
       reorder_channel_mappings: { Args: { _ids: string[] }; Returns: undefined }
       restore_schedule_publication_version: {

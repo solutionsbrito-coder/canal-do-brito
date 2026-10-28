@@ -262,4 +262,30 @@ describe("GameActions — ajuda de permissão do sino", () => {
       expect.stringContaining("Não foi possível salvar o lembrete")
     );
   });
+
+  it("A3: remover sem confirmação do banco mantém o sino marcado e mostra erro", async () => {
+    mockPush.permission = "granted";
+    mockPush.removeGameReminder = vi.fn(async () => false);
+    mockReminded.reminded = new Set<string>(["g1"]);
+    render(<GameActions game={game} />);
+    const bell = screen.getByRole("button", { name: /Remover lembrete de Teste A/ });
+    await fireEvent.click(bell);
+    expect(mockPush.removeGameReminder).toHaveBeenCalledWith("g1");
+    expect(mockReminded.unmarkReminded).not.toHaveBeenCalled();
+    expect(mockToast.error).toHaveBeenCalledWith(
+      expect.stringContaining("Não foi possível remover o lembrete")
+    );
+    expect(mockToast.info).not.toHaveBeenCalled();
+  });
+
+  it("A3: remover com confirmação do banco desmarca e avisa", async () => {
+    mockPush.permission = "granted";
+    mockPush.removeGameReminder = vi.fn(async () => true);
+    mockReminded.reminded = new Set<string>(["g1"]);
+    render(<GameActions game={game} />);
+    const bell = screen.getByRole("button", { name: /Remover lembrete de Teste A/ });
+    await fireEvent.click(bell);
+    expect(mockReminded.unmarkReminded).toHaveBeenCalledWith("g1");
+    expect(mockToast.info).toHaveBeenCalledWith("Lembrete removido.");
+  });
 });

@@ -106,9 +106,17 @@ export const GameActions = ({ game, showFollow = true }: GameActionsProps) => {
     if (isReminded) {
       setBusy(true);
       try {
-        await removeGameReminder(game.id);
-        unmarkReminded(game.id);
-        toast.info("Lembrete removido.");
+        // A3: só desmarca (local) e avisa quando a remoção for
+        // confirmada pelo banco. Se falhar, o sino continua marcado
+        // e o erro é honesto — desmarcar sem confirmação seria o
+        // mesmo "sucesso falso" do acender.
+        const removed = await removeGameReminder(game.id);
+        if (removed) {
+          unmarkReminded(game.id);
+          toast.info("Lembrete removido.");
+        } else {
+          toast.error("Não foi possível remover o lembrete. Tente de novo em instantes.");
+        }
       } finally {
         setBusy(false);
       }
