@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import type { DailyGame } from "@/hooks/useDailyGames";
 
 // Estado controlável do sino mockado. vi.hoisted roda antes das
 // factories do vi.mock (que são içadas), sem ele as factories
 // bateriam na zona morta (TDZ) dessas variáveis.
-const { mockPush, mockReminded, mockToast, mockDownloadIcs } = vi.hoisted(() => {
+const { mockPush, mockReminded, mockToast, mockDownloadIcs, mockMinutes, mockShowNotification } = vi.hoisted(() => {
   const mockPush: {
     permission: NotificationPermission;
     refreshPermission: ReturnType<typeof vi.fn>;
@@ -24,8 +24,13 @@ const { mockPush, mockReminded, mockToast, mockDownloadIcs } = vi.hoisted(() => 
   mockPush.refreshPermission = vi.fn(() => mockPush.permission);
   mockPush.addGameReminderWithReason = vi.fn(async () => ({ ok: true as const }));
   mockPush.removeGameReminder = vi.fn(async () => true);
+  // Minutos até o jogo, controláveis por teste (padrão: fluxo normal).
+  const mockMinutes = { value: 60 };
+  const mockShowNotification = vi.fn(async () => undefined);
   return {
     mockPush,
+    mockMinutes,
+    mockShowNotification,
     mockReminded: {
       reminded: new Set<string>(),
       markReminded: vi.fn(),
@@ -64,7 +69,7 @@ vi.mock("@/lib/meuCanal", () => ({
 }));
 
 vi.mock("@/lib/gameUtils", () => ({
-  getMinutesUntilStart: () => 60,
+  getMinutesUntilStart: () => mockMinutes.value,
   isGameCurrentlyLive: () => false,
   SPORT_LABEL: { futebol: "Futebol" },
 }));
@@ -136,6 +141,7 @@ describe("GameActions — ajuda de permissão do sino", () => {
     mockPush.addGameReminderWithReason = vi.fn(async () => ({ ok: true as const }));
     mockPush.settingsLoading = false;
     mockReminded.reminded = new Set<string>();
+    mockMinutes.value = 60;
     setMatchMediaStandalone(false);
   });
 
@@ -287,5 +293,67 @@ describe("GameActions — ajuda de permissão do sino", () => {
     await fireEvent.click(bell);
     expect(mockReminded.unmarkReminded).toHaveBeenCalledWith("g1");
     expect(mockToast.info).toHaveBeenCalledWith("Lembrete removido.");
+  });
+});
+
+describe("GameActions — A4 sino tardio (aviso local, sem lembrete morto)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPush.permission = "granted";
+    mockPush.refreshPermission = vi.fn(() => mockPush.permission);
+    mockPush.addGameReminderWithReason = vi.fn(async () => ({ ok: true as const }));
+    mockPush.settingsLoading = false;
+    mockReminded.reminded = new Set<string>();
+    mockMinutes.value = 60;
+    mockShowNotification.mockImplementation(async () => undefined);
+    Object.defineProperty(navigator, "serviceWorker", {
+      value: { ready: Promise.resolve({ showNotification: mockShowNotification }) },
+      configurable: true,
+    });
+    setMatchMediaStandalone(false);
+  });
+
+  it("sino tardio (10 min): dispara notificação local e NÃO chama o vínculo no servidor", async () => {
+    mockMinutes.value = 10;
+    const bell = renderActions();
+    await fireEvent.click(bell);
+    expect(mockShowNotification).toHaveBeenCalledWith(
+      "Começa em 10 min!",
+      expect.objectContaining({
+        body: "Teste A x Teste B — Teste",
+        tag: "game-g1-now",
+      })
+    );
+    expect(mockPush.addGameReminderWithReason).not.toHaveBeenCalled();
+    expect(mockReminded.markReminded).not.toHaveBeenCalled();
+    // O aviso local passa por awaits (serviceWorker.ready) — espera
+    // as microtarefas antes de afirmar o toast.
+    await waitFor(() =>
+      expect(mockToast.success).toHaveBeenCalledWith(
+        expect.stringContaining("Aviso na hora")
+      )
+    );
+  });
+
+  it("fronteira: 13 min usa o fluxo normal do servidor (12 min ou menos é aviso local)", async () => {
+    mockMinutes.value = 13;
+    const bell = renderActions();
+    await fireEvent.click(bell);
+    expect(mockPush.addGameReminderWithReason).toHaveBeenCalledWith("g1");
+    expect(mockShowNotification).not.toHaveBeenCalled();
+  });
+
+  it("sino tardio com falha na notificação local: erro honesto e sino não marcado", async () => {
+    mockMinutes.value = 5;
+    mockShowNotification.mockRejectedValueOnce(new Error("sw gone"));
+    const bell = renderActions();
+    await fireEvent.click(bell);
+    expect(mockPush.addGameReminderWithReason).not.toHaveBeenCalled();
+    expect(mockReminded.markReminded).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(mockToast.error).toHaveBeenCalledWith(
+        expect.stringContaining("Não foi possível mostrar o aviso na hora")
+      )
+    );
   });
 });

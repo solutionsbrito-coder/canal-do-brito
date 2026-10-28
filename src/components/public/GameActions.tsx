@@ -7,6 +7,10 @@ import { useRemindedGames } from "@/hooks/useRemindedGames";
 import { useMeuCanal } from "@/hooks/useMeuCanal";
 import { isCompetitionFollowed, isSportFollowed, isTeamFollowed } from "@/lib/meuCanal";
 import { getMinutesUntilStart, isGameCurrentlyLive, SPORT_LABEL, type SportType } from "@/lib/gameUtils";
+import {
+  getLateBellMinutes,
+  showLateGameNotification,
+} from "@/lib/lateGameNotification";
 import { detectedSport } from "@/components/agenda/public/highlightsCuration";
 import { downloadGameIcs } from "@/lib/ics";
 import {
@@ -48,6 +52,13 @@ interface GameActionsProps {
  *   banco) têm mensagens próprias e honestas — nunca "verifique se
  *   as notificações estão liberadas" quando a permissão não é o
  *   problema.
+ * - Sino tardio (A4): se faltam menos de 13 min para o jogo, o tick
+ *   de 15 min já passou e um lembrete no servidor seria morto. O
+ *   sino então NÃO grava nada no servidor: mostra na hora uma
+ *   notificação local via service worker ("Começa em X min!") e
+ *   avisa em toast o que aconteceu. O sino não fica marcado como
+ *   lembrete ativo. A partir de 13 min, o fluxo normal de 15 min
+ *   via servidor continua inalterado.
  */
 export const GameActions = ({ game, showFollow = true }: GameActionsProps) => {
   const {
@@ -68,8 +79,62 @@ export const GameActions = ({ game, showFollow = true }: GameActionsProps) => {
   const live = isGameCurrentlyLive(game.game_time, game.date, sport as SportType);
   const upcoming = !live && minutesUntil !== null && minutesUntil > 0;
   const isReminded = reminded.has(game.id);
+  // A4 — sino tardio: o servidor só dispara no tick de 15 min antes
+  // (janela de 13–17 min). Abaixo de 13 min não há tick futuro que
+  // enviaria o aviso, então o sino não deve criar um lembrete morto.
+  // Regra e formato do aviso local vivem em lateGameNotification.ts,
+  // compartilhados com o sino compacto da agenda.
+  const isLateBell = getLateBellMinutes(game) !== null;
+
+  // A4 — aviso imediato, sem tocar no servidor: notificação local via
+  // service worker, com o mesmo formato do push normal. Não marca o
+  // sino como lembrete (não há nada agendado no servidor) e não chama
+  // nenhum RPC de vínculo.
+  const attemptLateNotification = async () => {
+    setBusy(true);
+    try {
+      // Permissão: espelha o fluxo do sino — se ainda não foi decidida,
+      // pede agora; se negada, abre a ajuda em vez de prometer aviso.
+      let current = refreshPermission ? refreshPermission() : permission;
+      if (current === "default" && typeof Notification !== "undefined") {
+        current = await Notification.requestPermission();
+      }
+      if (current === "denied") {
+        setDialog("help-denied");
+        return;
+      }
+      if (current !== "granted") return; // usuário dispensou o pedido
+      if (!("serviceWorker" in navigator)) {
+        toast.error("Este navegador não suporta notificações push. Use a agenda (.ics) abaixo.");
+        return;
+      }
+      const minutes = minutesUntil as number;
+      const shown = await showLateGameNotification(game, minutes);
+      if (!shown) {
+        toast.error("Não foi possível mostrar o aviso na hora. Tente de novo em instantes.");
+        return;
+      }
+      // Aviso honesto: explica que o aviso de 15 min já passou e que
+      // nada ficou agendado — o usuário já recebeu o aviso agora.
+      toast.success(
+        `Aviso na hora: o jogo começa em ${minutes} min! O aviso de 15 min já tinha passado, então não criamos um lembrete.`
+      );
+    } catch {
+      toast.error("Não foi possível mostrar o aviso na hora. Tente de novo em instantes.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const attemptReminder = async () => {
+    // A4: sino tardio não passa pelo fluxo de servidor — todos os
+    // caminhos que chamam attemptReminder (sino com permissão
+    // concedida, "Permitir" do aviso, "Tentar de novo" da ajuda)
+    // caem aqui e ganham o aviso imediato.
+    if (isLateBell) {
+      await attemptLateNotification();
+      return;
+    }
     setBusy(true);
     try {
       const result = await addGameReminderWithReason(game.id);

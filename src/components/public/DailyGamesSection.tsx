@@ -13,6 +13,10 @@ import {
   getTomorrowDateString,
   type SportType,
 } from "@/lib/gameUtils";
+import {
+  getLateBellMinutes,
+  showLateGameNotification,
+} from "@/lib/lateGameNotification";
 import { NextGameHero } from "./NextGameHero";
 import { ScheduleHeader } from "./schedule/ScheduleHeader";
 import { ScheduleFilters, type FilterCategory } from "./schedule/ScheduleFilters";
@@ -35,18 +39,53 @@ export const DailyGamesSection = () => {
   const [channelFilter, setChannelFilter] = useState<string | null>(null);
   const [openFilter, setOpenFilter] = useState<FilterCategory | null>(null);
 
-  const { addGameReminder, removeGameReminder, isSupported: pushSupported } = usePushSubscription();
+  const {
+    addGameReminder,
+    removeGameReminder,
+    isSupported: pushSupported,
+    permission,
+    refreshPermission,
+  } = usePushSubscription();
   const handlePushReminder = useCallback(
     async (gameId: string, add: boolean) => {
       if (!pushSupported) return;
       if (add) {
+        // A4 — sino compacto: mesma regra do sino do card. Abaixo de
+        // 13 min não há tick futuro do servidor, então o toque não
+        // cria lembrete morto: sai o aviso local na hora, sem RPC.
+        // (Este caminho hoje é legado — GameCard ignora a prop e usa
+        // GameActions — mas se voltar a ser usado, não pode divergir.)
+        const game = [...(games || []), ...(tomorrowGames || [])].find((g) => g.id === gameId);
+        const lateMinutes = game ? getLateBellMinutes(game) : null;
+        if (lateMinutes !== null && game) {
+          let current = refreshPermission ? refreshPermission() : permission;
+          if (current === "default" && typeof Notification !== "undefined") {
+            current = await Notification.requestPermission();
+          }
+          if (current === "denied") {
+            toast.error(
+              "Permissão de notificação negada. Libere nas configurações do aparelho — o passo a passo está na ajuda em Meu Canal."
+            );
+            return;
+          }
+          if (current !== "granted") return; // usuário dispensou o pedido
+          const shown = await showLateGameNotification(game, lateMinutes);
+          if (shown) {
+            toast.success(
+              `Aviso na hora: o jogo começa em ${lateMinutes} min! O aviso de 15 min já tinha passado, então não criamos um lembrete.`
+            );
+          } else {
+            toast.error("Não foi possível mostrar o aviso na hora. Tente de novo em instantes.");
+          }
+          return;
+        }
         const ok = await addGameReminder(gameId);
         if (ok) toast.success("Você será notificado 15min antes!");
       } else {
         await removeGameReminder(gameId);
       }
     },
-    [addGameReminder, removeGameReminder, pushSupported]
+    [addGameReminder, removeGameReminder, pushSupported, permission, refreshPermission, games, tomorrowGames]
   );
 
   /* Dynamic filter options */
