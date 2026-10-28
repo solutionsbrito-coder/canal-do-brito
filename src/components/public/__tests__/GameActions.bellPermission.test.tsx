@@ -11,12 +11,14 @@ const { mockPush, mockReminded, mockToast, mockDownloadIcs } = vi.hoisted(() => 
     refreshPermission: ReturnType<typeof vi.fn>;
     addGameReminderWithReason: ReturnType<typeof vi.fn>;
     removeGameReminder: ReturnType<typeof vi.fn>;
+    settingsLoading: boolean;
     isSupported: boolean;
   } = {
     permission: "default",
     refreshPermission: null as unknown as ReturnType<typeof vi.fn>,
     addGameReminderWithReason: null as unknown as ReturnType<typeof vi.fn>,
     removeGameReminder: null as unknown as ReturnType<typeof vi.fn>,
+    settingsLoading: false,
     isSupported: true,
   };
   mockPush.refreshPermission = vi.fn(() => mockPush.permission);
@@ -132,6 +134,7 @@ describe("GameActions — ajuda de permissão do sino", () => {
     mockPush.permission = "default";
     mockPush.refreshPermission = vi.fn(() => mockPush.permission);
     mockPush.addGameReminderWithReason = vi.fn(async () => ({ ok: true as const }));
+    mockPush.settingsLoading = false;
     mockReminded.reminded = new Set<string>();
     setMatchMediaStandalone(false);
   });
@@ -233,6 +236,16 @@ describe("GameActions — ajuda de permissão do sino", () => {
     expect(
       await screen.findByRole("dialog", { name: /Notificações bloqueadas/ })
     ).toBeInTheDocument();
+  });
+
+  it("settings carregando: sino desabilitado com 'Carregando...' e não chama o lembrete", async () => {
+    mockPush.settingsLoading = true;
+    const bell = renderActions();
+    expect(bell).toBeDisabled();
+    expect(bell).toHaveTextContent("Carregando...");
+    await fireEvent.click(bell);
+    expect(mockPush.addGameReminderWithReason).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("falha de banco tem mensagem própria e não abre a ajuda nem marca o lembrete", async () => {

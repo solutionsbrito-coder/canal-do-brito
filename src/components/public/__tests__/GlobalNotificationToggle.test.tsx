@@ -9,12 +9,14 @@ const { mockPush, mockToast } = vi.hoisted(() => {
     subscription: unknown | null;
     refreshPermission: ReturnType<typeof vi.fn>;
     subscribeDevice: ReturnType<typeof vi.fn>;
+    settingsLoading: boolean;
     isSupported: boolean;
   } = {
     permission: "default",
     subscription: null,
     refreshPermission: null as unknown as ReturnType<typeof vi.fn>,
     subscribeDevice: null as unknown as ReturnType<typeof vi.fn>,
+    settingsLoading: false,
     isSupported: true,
   };
   mockPush.refreshPermission = vi.fn(() => mockPush.permission);
@@ -60,6 +62,7 @@ describe("GlobalNotificationToggle — botão global de notificações", () => {
     vi.clearAllMocks();
     mockPush.permission = "default";
     mockPush.subscription = null;
+    mockPush.settingsLoading = false;
     mockPush.isSupported = true;
     mockPush.refreshPermission = vi.fn(() => mockPush.permission);
     mockPush.subscribeDevice = vi.fn(async () => ({ ok: true as const }));
@@ -134,6 +137,17 @@ describe("GlobalNotificationToggle — botão global de notificações", () => {
     expect(active).toBeInTheDocument();
     expect(active).toBeDisabled();
     await fireEvent.click(active);
+    expect(mockPush.subscribeDevice).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("settings carregando: botão desabilitado com 'Carregando...' e não inscreve", async () => {
+    mockPush.settingsLoading = true;
+    render(<GlobalNotificationToggle />);
+    const button = screen.getByRole("button", { name: "Carregando notificações" });
+    expect(button).toBeDisabled();
+    expect(button).toHaveTextContent("Carregando...");
+    await fireEvent.click(button);
     expect(mockPush.subscribeDevice).not.toHaveBeenCalled();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });

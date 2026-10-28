@@ -56,6 +56,7 @@ export const GameActions = ({ game, showFollow = true }: GameActionsProps) => {
     isSupported: pushSupported,
     permission,
     refreshPermission,
+    settingsLoading,
   } = usePushSubscription();
   const { reminded, markReminded, unmarkReminded } = useRemindedGames();
   const { prefs, toggleTeam, toggleSport, toggleCompetition } = useMeuCanal();
@@ -92,7 +93,9 @@ export const GameActions = ({ game, showFollow = true }: GameActionsProps) => {
   };
 
   const handleBell = async () => {
-    if (busy) return;
+    // Settings ainda carregando: o sino já está desabilitado nesse
+    // estado; o guarda impede toques que escapem do disabled.
+    if (busy || settingsLoading) return;
     if (!pushSupported) {
       toast.error("Este navegador não suporta notificações push. Use a agenda (.ics) abaixo.");
       return;
@@ -164,7 +167,7 @@ export const GameActions = ({ game, showFollow = true }: GameActionsProps) => {
         <button
           type="button"
           onClick={handleBell}
-          disabled={busy}
+          disabled={busy || settingsLoading}
           aria-label={isReminded ? `Remover lembrete de ${game.home_team}` : `Me avise 15 min antes de ${game.home_team}`}
           aria-pressed={isReminded}
           className={`inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-full text-[11px] font-bold transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
@@ -174,7 +177,7 @@ export const GameActions = ({ game, showFollow = true }: GameActionsProps) => {
           }`}
         >
           {isReminded ? <BellRing className="h-3.5 w-3.5" aria-hidden /> : <Bell className="h-3.5 w-3.5" aria-hidden />}
-          {isReminded ? "Lembrete ativo" : "Me avise 15 min antes"}
+          {isReminded ? "Lembrete ativo" : settingsLoading ? "Carregando..." : "Me avise 15 min antes"}
         </button>
       )}
       {(upcoming || live) && (

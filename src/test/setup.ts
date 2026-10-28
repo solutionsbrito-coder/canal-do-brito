@@ -24,6 +24,7 @@ vi.mock("@/hooks/usePushSubscription", () => ({
   usePushSubscription: () => ({
     permission: "default" as NotificationPermission,
     refreshPermission: () => "default" as NotificationPermission,
+    settingsLoading: false,
     subscription: null,
     subscribe: async () => null,
     subscribeDevice: async () => ({ ok: true as const }),

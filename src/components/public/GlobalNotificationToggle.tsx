@@ -30,6 +30,7 @@ export const GlobalNotificationToggle = () => {
   const {
     permission,
     refreshPermission,
+    settingsLoading,
     subscription,
     subscribeDevice,
     isSupported: pushSupported,
@@ -63,7 +64,10 @@ export const GlobalNotificationToggle = () => {
   };
 
   const handleClick = async () => {
-    if (busy) return;
+    // Settings ainda carregando: a chave VAPID pode nem ter chegado
+    // ao hook — o botão já está desabilitado nesse estado, mas o
+    // guarda impede qualquer toque que escape (teclado, leitor).
+    if (busy || settingsLoading) return;
     if (!pushSupported) {
       toast.error("Este navegador não suporta notificações push.");
       return;
@@ -110,11 +114,13 @@ export const GlobalNotificationToggle = () => {
       <button
         type="button"
         onClick={handleClick}
-        disabled={busy || isActive || !pushSupported}
+        disabled={busy || isActive || !pushSupported || settingsLoading}
         aria-label={
           isActive
             ? "Notificações ativas neste aparelho"
-            : "Ativar notificações neste aparelho"
+            : settingsLoading
+              ? "Carregando notificações"
+              : "Ativar notificações neste aparelho"
         }
         aria-pressed={isActive}
         className={`inline-flex items-center gap-1.5 min-h-[44px] px-4 rounded-full text-[12px] font-bold transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
@@ -130,9 +136,11 @@ export const GlobalNotificationToggle = () => {
         )}
         {isActive
           ? "Notificações ativas"
-          : !pushSupported
-            ? "Notificações não suportadas neste navegador"
-            : "Ativar notificações"}
+          : settingsLoading
+            ? "Carregando..."
+            : !pushSupported
+              ? "Notificações não suportadas neste navegador"
+              : "Ativar notificações"}
       </button>
       {!pushSupported && (
         <p className="text-[12px] text-white/55">

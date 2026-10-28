@@ -45,7 +45,15 @@ export type AddReminderResult = {
 };
 
 export function usePushSubscription() {
-  const { data: settings } = useSettings();
+  const settingsQuery = useSettings();
+  const settings = settingsQuery.data;
+  // A consulta de settings pode ainda estar em voo quando o visitante
+  // toca no sino/botão global: nesse momento settings é undefined e
+  // a chave VAPID "não existe" só porque ainda não chegou. Expor o
+  // carregamento para a UI desabilitar o botão até a leitura terminar.
+  const settingsLoading =
+    settingsQuery.isPending ?? settingsQuery.isLoading ?? false;
+  const refetchSettings = settingsQuery.refetch;
   const [subscription, setSubscription] = useState<PushSubscription | null>(null);
   const [permission, setPermission] = useState<NotificationPermission>(
     typeof Notification !== "undefined" ? Notification.permission : "default"
@@ -92,7 +100,22 @@ export function usePushSubscription() {
     sub?: PushSubscription;
     reason?: AddReminderFailureReason;
   }> => {
-    if (!vapidPublicKey) return { ok: false, reason: "no-vapid" };
+    // Chave ausente no hook pode ser só leitura atrasada ou erro
+    // transitório (foi o caso real de 28/10: o botão global devolveu
+    // no-vapid com a chave existindo no banco). Antes de concluir
+    // que a configuração do site está errada, faz UMA nova leitura
+    // e usa a chave fresca — sem inventar chave e sem cache local.
+    // Se mesmo após o refetch não houver chave, aí sim é no-vapid.
+    let key = vapidPublicKey;
+    if (!key) {
+      try {
+        const fresh = await refetchSettings();
+        key = fresh.data?.vapid_public_key;
+      } catch {
+        // Mantém no-vapid abaixo: refetch falho não vira outro erro.
+      }
+    }
+    if (!key) return { ok: false, reason: "no-vapid" };
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
       return { ok: false, reason: "unsupported" };
     }
@@ -113,7 +136,7 @@ export function usePushSubscription() {
       if (!sub) {
         sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey).buffer as ArrayBuffer,
+          applicationServerKey: urlBase64ToUint8Array(key).buffer as ArrayBuffer,
         });
       }
       setSubscription(sub);
@@ -124,7 +147,7 @@ export function usePushSubscription() {
       console.error("Push subscribe error:", err);
       return { ok: false, reason: "subscribe-error" };
     }
-  }, [vapidPublicKey]);
+  }, [vapidPublicKey, refetchSettings]);
 
   /**
    * Inscrição do aparelho, sem toasts e sem jogo: usada pelo botão
@@ -210,6 +233,7 @@ export function usePushSubscription() {
   return {
     permission,
     refreshPermission,
+    settingsLoading,
     subscription,
     subscribe,
     subscribeDevice,
