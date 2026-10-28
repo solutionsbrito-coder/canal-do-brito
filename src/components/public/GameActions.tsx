@@ -241,7 +241,7 @@ export const GameActions = ({ game, showFollow = true }: GameActionsProps) => {
           type="button"
           onClick={handleBell}
           disabled={busy || settingsLoading}
-          aria-label={isReminded ? `Remover lembrete de ${game.home_team}` : `Me avise 15 min antes de ${game.home_team}`}
+          aria-label={busy ? "Verificando lembrete" : isReminded ? `Remover lembrete de ${game.home_team}` : `Me avise 15 min antes de ${game.home_team}`}
           aria-pressed={isReminded}
           className={`inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-full text-[11px] font-bold transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
             isReminded
@@ -250,7 +250,10 @@ export const GameActions = ({ game, showFollow = true }: GameActionsProps) => {
           }`}
         >
           {isReminded ? <BellRing className="h-3.5 w-3.5" aria-hidden /> : <Bell className="h-3.5 w-3.5" aria-hidden />}
-          {isReminded ? "Lembrete ativo" : settingsLoading ? "Carregando..." : "Me avise 15 min antes"}
+          {/* C5 — enquanto o RPC (ou o aviso tardio local) não retorna,
+              o sino mostra "Verificando..." em vez de acender na hora:
+              acender antes da confirmação seria o "sucesso falso". */}
+          {busy ? "Verificando..." : isReminded ? "Lembrete ativo" : settingsLoading ? "Carregando..." : "Me avise 15 min antes"}
         </button>
       )}
       {(upcoming || live) && (

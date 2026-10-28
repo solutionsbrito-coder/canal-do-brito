@@ -174,6 +174,36 @@ describe("GameActions — ajuda de permissão do sino", () => {
     expect(mockPush.addGameReminderWithReason).not.toHaveBeenCalled();
   });
 
+  it("C3 — ajuda: mostra som do canal e 'não force a parada do Chrome'", async () => {
+    mockPush.permission = "denied";
+    const bell = renderActions();
+    await fireEvent.click(bell);
+    await screen.findByRole("dialog", { name: /Notificações bloqueadas/ });
+    expect(screen.getByText(/Depois de liberar, atenção a mais duas coisas/)).toBeInTheDocument();
+    expect(screen.getByText(/Sem som\?/)).toBeInTheDocument();
+    expect(screen.getByText(/não consegue escolher um som próprio/)).toBeInTheDocument();
+    expect(screen.getByText(/Não force a parada do Chrome/)).toBeInTheDocument();
+    expect(screen.getByText(/pode ficar retido/)).toBeInTheDocument();
+  });
+
+  it("C5 — sino mostra 'Verificando...' enquanto o RPC não retorna", async () => {
+    mockPush.permission = "granted";
+    let resolveReminder!: (v: { ok: true }) => void;
+    const pending = new Promise<{ ok: true }>((resolve) => {
+      resolveReminder = resolve;
+    });
+    mockPush.addGameReminderWithReason = vi.fn(() => pending);
+    const bell = renderActions();
+    fireEvent.click(bell);
+    expect(await screen.findByText("Verificando...")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Verificando lembrete" })).toBeDisabled();
+    expect(mockReminded.markReminded).not.toHaveBeenCalled();
+    resolveReminder({ ok: true });
+    await waitFor(() => {
+      expect(mockReminded.markReminded).toHaveBeenCalledWith("g1");
+    });
+  });
+
   it("permissão denied no PWA Android: caminho principal é o Chrome, não só o app", async () => {
     mockPush.permission = "denied";
     Object.defineProperty(window, "navigator", {

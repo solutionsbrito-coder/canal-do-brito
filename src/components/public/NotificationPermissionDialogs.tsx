@@ -159,6 +159,32 @@ export const NotificationPermissionDialogs = ({
             </details>
           ))}
         </div>
+        {/* C3 — depois de liberar, duas causas comuns de "chegou sem
+            som" e de "só apareceu quando abri o app". Valem para
+            qualquer contexto, por isso ficam fora das seções: o som
+            é do canal de notificação do sistema (a API web não tem
+            som personalizado), e o Chrome parado à força não entrega
+            push até rodar de novo — diferente de fechar o app
+            instalado, que o passo a passo do PWA pede. */}
+        <div className="mt-4">
+          <h4 className="text-sm font-bold text-[#00ff87]">
+            Depois de liberar, atenção a mais duas coisas
+          </h4>
+          <ul className="mt-2 space-y-1.5 text-sm leading-relaxed text-white/80">
+            <li>
+              <span className="font-bold text-white">Sem som?</span> O som é
+              o do canal de notificação do sistema: Android →
+              Informações do app CanalBrito (ou do Chrome) →
+              Notificações → toque no canal → Som. O site não consegue
+              escolher um som próprio.
+            </li>
+            <li>
+              <span className="font-bold text-white">Não force a parada do Chrome.</span>{" "}
+              Com o Chrome parado à força, o aviso pode ficar retido e só
+              aparecer quando você abrir o app de novo.
+            </li>
+          </ul>
+        </div>
         <div className="mt-4 flex flex-col gap-2">
           <button
             type="button"
