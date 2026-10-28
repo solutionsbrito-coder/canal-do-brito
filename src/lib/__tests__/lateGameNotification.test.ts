@@ -69,7 +69,7 @@ describe("lateGameNotification — regra do sino tardio (A4)", () => {
     );
   });
 
-  it("showLateGameNotification exibe com tag, ícone, vibração e renotify", async () => {
+  it("showLateGameNotification exibe com tag, ícone, vibração longa, requireInteraction e renotify", async () => {
     const mockShow = vi.fn(async () => undefined);
     Object.defineProperty(navigator, "serviceWorker", {
       value: { ready: Promise.resolve({ showNotification: mockShow }) },
@@ -83,7 +83,8 @@ describe("lateGameNotification — regra do sino tardio (A4)", () => {
         tag: "game-g1-now",
         icon: "/pwa-192x192.png",
         badge: "/pwa-192x192.png",
-        vibrate: [200, 100, 200],
+        vibrate: [300, 100, 300, 100, 300],
+        requireInteraction: true,
         renotify: true,
       })
     );

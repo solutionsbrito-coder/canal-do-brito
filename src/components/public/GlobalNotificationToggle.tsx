@@ -16,6 +16,13 @@ import {
  * leigo libera uma única vez, fora da pressa de um jogo específico,
  * e depois usa o sino normalmente nos jogos.
  *
+ * C1 — confusão botão global × lembrete: quando ativo, a seção mostra
+ * "Aparelho liberado ✓" + o atalho "Ver jogos de hoje" para a agenda,
+ * para ninguém achar que ativar aqui já marcou algum jogo. O sino de
+ * cada card já tem rótulo explícito ("Me avise 15 min antes"), não só
+ * ícone — a premissa "só ícone" da auditoria não se confirmou no
+ * código atual, então o sino não precisou mudar neste lote.
+ *
  * O que ele faz — e o que ele NÃO promete:
  * - Só cria a inscrição push do aparelho (endpoint + chaves, via o
  *   mesmo fluxo do sino). Não marca lembrete de nenhum jogo: os
@@ -142,6 +149,20 @@ export const GlobalNotificationToggle = () => {
               ? "Notificações não suportadas neste navegador"
               : "Ativar notificações"}
       </button>
+      {isActive && (
+        <div className="space-y-2 pt-1">
+          <p className="text-[12.5px] leading-relaxed text-[#00ff87]">
+            Aparelho liberado ✓ — agora toque no sino de cada jogo para ser
+            avisado 15 min antes. Ativar aqui não marca nenhum jogo sozinho.
+          </p>
+          <a
+            href="/#esportes"
+            className="inline-flex items-center min-h-[44px] px-4 rounded-full text-[12px] font-bold bg-white/[0.06] text-white/80 border border-white/10 hover:bg-white/10 transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+          >
+            Ver jogos de hoje
+          </a>
+        </div>
+      )}
       {!pushSupported && (
         <p className="text-[12px] text-white/55">
           Este navegador não suporta notificações push. Nos jogos, use

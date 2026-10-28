@@ -74,12 +74,15 @@ self.addEventListener("push", (event) => {
     body: data.body || "",
     icon: "/pwa-192x192.png",
     badge: "/pwa-192x192.png",
-    vibrate: [200, 100, 200],
+    // C2 — presença: vibração mais longa e a notificação fica parada
+    // até o visitante dispensar (no desktop, é esse o objetivo).
+    vibrate: [300, 100, 300, 100, 300],
+    requireInteraction: true,
     tag: data.tag || "game-reminder",
     renotify: true,
     data: { url: data.url || "/" },
     actions: [{ action: "open", title: "Abrir" }],
-  } as NotificationOptions & { vibrate: number[]; renotify: boolean; actions: Array<{ action: string; title: string }> };
+  } as NotificationOptions & { vibrate: number[]; renotify: boolean; requireInteraction: boolean; actions: Array<{ action: string; title: string }> };
 
   event.waitUntil(
     self.registration.showNotification(data.title || "Canal do Brito", options)

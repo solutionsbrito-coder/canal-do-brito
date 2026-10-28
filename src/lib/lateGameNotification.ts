@@ -66,10 +66,13 @@ export async function showLateGameNotification(
       tag: `game-${game.id}-now`,
       icon: "/pwa-192x192.png",
       badge: "/pwa-192x192.png",
-      vibrate: [200, 100, 200],
+      // C2 — mesma presença do push do servidor: vibração mais longa
+      // e notificação parada até dispensar.
+      vibrate: [300, 100, 300, 100, 300],
+      requireInteraction: true,
       renotify: true,
       data: { url: "/#esportes" },
-    } as NotificationOptions & { vibrate: number[]; renotify: boolean });
+    } as NotificationOptions & { vibrate: number[]; renotify: boolean; requireInteraction: boolean });
     return true;
   } catch {
     return false;

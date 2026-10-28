@@ -141,6 +141,24 @@ describe("GlobalNotificationToggle — botão global de notificações", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
+  it("C1 — ativo: mostra 'Aparelho liberado' e o atalho 'Ver jogos de hoje'", () => {
+    mockPush.permission = "granted";
+    mockPush.subscription = { endpoint: "https://example.test/push" };
+    render(<GlobalNotificationToggle />);
+    expect(screen.getByText(/Aparelho liberado/i)).toBeInTheDocument();
+    expect(screen.getByText(/não marca nenhum jogo sozinho/i)).toBeInTheDocument();
+    const link = screen.getByRole("link", { name: "Ver jogos de hoje" });
+    expect(link).toHaveAttribute("href", "/#esportes");
+  });
+
+  it("C1 — inativo: não mostra o estado liberado nem o atalho para a agenda", () => {
+    render(<GlobalNotificationToggle />);
+    expect(screen.queryByText(/Aparelho liberado/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Ver jogos de hoje" })
+    ).not.toBeInTheDocument();
+  });
+
   it("settings carregando: botão desabilitado com 'Carregando...' e não inscreve", async () => {
     mockPush.settingsLoading = true;
     render(<GlobalNotificationToggle />);
