@@ -868,6 +868,10 @@ export type Database = {
         Args: { _version_id: string }
         Returns: number
       }
+      transfer_push_game_ids: {
+        Args: { _new_endpoint: string; _old_endpoint: string }
+        Returns: boolean
+      }
       upsert_push_subscription: {
         Args: { _auth: string; _endpoint: string; _p256dh: string }
         Returns: undefined

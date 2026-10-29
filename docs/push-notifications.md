@@ -69,10 +69,27 @@ Supabase; o que está aqui é o comportamento, não o código).
   o próximo tick (`kept_for_retry`); inscrição expirada (410/404) é
   apagada; invocação dupla é amortecida por dedupe + releitura de
   `game_ids` antes de cada envio (`skipped`, `deduped` na resposta) —
-  trava não atômica; o reclamo atômico depende da tabela de log do
-  B4, ainda pendente.
+  trava não atômica; o log do B4 reduz duplicatas entre ticks (pares
+  já enviados nas últimas 24h são pulados), não dentro do mesmo
+  instante.
+- Cada tentativa é registrada em `push_delivery_log` (B4: `sent`,
+  `failed`, `skipped`, `expired`), com poda de 30 dias pelo job
+  diário do B3. O log é best-effort: falha dele nunca quebra o envio.
 - O sino tardio (< 13 min) NÃO passa pela função: é notificação local
   imediata, sem vínculo no servidor (A4).
+
+## Rotação de endpoint (B1 + B2)
+
+- O service worker tenta re-sincronizar o endpoint novo sozinho
+  quando o navegador rotaciona (B2, best-effort).
+- O app guarda o endpoint atual em localStorage
+  (`canalbrito:push-endpoint:v1`) a cada sync; no sync seguinte, se o
+  endpoint mudou, chama a RPC `transfer_push_game_ids`, que COPIA
+  (união, sem duplicar) os `game_ids` do endpoint antigo para o novo
+  (B1). Cópia, não movimento: a linha antiga continua intacta — se
+  ela ainda está viva em outro contexto, continua recebendo; se está
+  morta, a função a apaga no próximo 410/404 e o job do B3 limpa o
+  resto.
 
 ## Como saber se está saudável
 
@@ -96,12 +113,17 @@ A7+B6): execuções a cada 5 minutos, todas com `status = 'succeeded'`.
 ## O que NÃO significa "succeeded"
 
 O `return_message` do pg_cron ("1 row") diz só que o comando SQL
-rodou — NÃO diz quantos pushes foram enviados. Hoje não há log
-persistente de entrega: a resposta da função (`sent`,
-`kept_for_retry`, `skipped`, `errors`) só existe na execução e se
-perde. Isso é o B4 (tabela `push_delivery_log`), ainda pendente.
-Enquanto o B4 não existe, "job succeeded" + "nenhum erro no Overview
-da função" é o máximo que dá para afirmar sem um jogo real na janela.
+rodou — NÃO diz quantos pushes foram enviados. Desde o B4, há log
+persistente de entrega em `push_delivery_log`: para ver o que saiu
+de fato num dia, consulte o log (a resposta da função continua
+efêmera, mas o log fica 30 dias):
+
+```sql
+-- O que foi enviado / falhou / pulado no último dia?
+SELECT status, count(*) FROM push_delivery_log
+WHERE created_at > now() - interval '1 day'
+GROUP BY status;
+```
 
 ## Alerta: se o job parar, nada avisa
 

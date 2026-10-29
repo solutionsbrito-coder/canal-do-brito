@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/hooks/useSettings";
+import {
+  PUSH_ENDPOINT_STORAGE_KEY,
+  transferPushEndpointIfRotated,
+} from "@/lib/pushEndpointTransfer";
 import { toast } from "sonner";
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
@@ -81,6 +85,19 @@ export function usePushSubscription() {
         try {
           // Always re-sync keys in case browser rotated them
           await syncKeysToDb(sub);
+          // B1: se o endpoint rotacionou desde o último sync, copia
+          // os lembretes do endpoint antigo para o novo (best-effort,
+          // nunca quebra o sino).
+          await transferPushEndpointIfRotated(sub.endpoint, {
+            getStoredEndpoint: () => localStorage.getItem(PUSH_ENDPOINT_STORAGE_KEY),
+            setStoredEndpoint: (endpoint) =>
+              localStorage.setItem(PUSH_ENDPOINT_STORAGE_KEY, endpoint),
+            transferGameIds: (oldEndpoint, newEndpoint) =>
+              supabase.rpc("transfer_push_game_ids", {
+                _old_endpoint: oldEndpoint,
+                _new_endpoint: newEndpoint,
+              }),
+          });
           setSubscription(sub);
         } catch (err) {
           console.error("Push sync error:", err);
@@ -156,6 +173,18 @@ export function usePushSubscription() {
       }
       setSubscription(sub);
       await syncKeysToDb(sub);
+      // B1: mesmo caso do mount — inscrição nova pode ser rotação da
+      // antiga; copia os lembretes antes de considerar o sino pronto.
+      await transferPushEndpointIfRotated(sub.endpoint, {
+        getStoredEndpoint: () => localStorage.getItem(PUSH_ENDPOINT_STORAGE_KEY),
+        setStoredEndpoint: (endpoint) =>
+          localStorage.setItem(PUSH_ENDPOINT_STORAGE_KEY, endpoint),
+        transferGameIds: (oldEndpoint, newEndpoint) =>
+          supabase.rpc("transfer_push_game_ids", {
+            _old_endpoint: oldEndpoint,
+            _new_endpoint: newEndpoint,
+          }),
+      });
 
       return { ok: true, sub };
     } catch (err) {
