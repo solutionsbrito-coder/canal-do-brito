@@ -479,3 +479,21 @@ Cracker Barrel 400
     });
   });
 });
+
+describe("lote Programação — barra invertida do GPT", () => {
+  it("remove a barra final do visitante vinda da cópia do GPT", () => {
+    const text = [
+      "TÍTULO: 🗓️ Programação Esportiva — 29/10",
+      "",
+      "📅 Dia 29/10",
+      "",
+      "Harimoto x B. Takahashi\\",
+      "🏓 WTT Champions Montpellier (1ª Rodada) / ⏰ 09h45 / #tenis",
+      "📺 SporTV 3, CazéTV",
+    ].join("\n");
+    const games = parseScheduleText(text, "2026-10-29");
+    expect(games).toHaveLength(1);
+    expect(games[0].away_team).toBe("B. Takahashi");
+    expect(games[0].home_team).toBe("Harimoto");
+  });
+});

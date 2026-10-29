@@ -216,7 +216,11 @@ function cleanText(s: string): string {
     .replace(/[\u{1F3F4}\u{E0067}-\u{E007F}]/gu, "") // remove subdivision flags
     .replace(/[\uD800-\uDFFF]/g, "")     // remove broken UTF-16 surrogates
     .replace(/\s{2,}/g, " ")             // double spaces
-    .trim();
+    .trim()
+    // Texto do GPT às vezes termina a linha com "\" (quebra de linha
+    // do markdown ao copiar). Sem isto, o "\" ia para o banco no fim
+    // do nome do visitante — e aparecia na revisão e no site.
+    .replace(/\\+$/, "");
 }
 
 /** Sanitize any string to be JSON-safe (remove surrogates + flag emojis) */
@@ -226,7 +230,9 @@ function sanitizeStr(s: string): string {
     .replace(/[\u{1F1E6}-\u{1F1FF}]/gu, "")
     .replace(/[\u{1F3F4}\u{E0067}-\u{E007F}]/gu, "")
     .replace(/\s{2,}/g, " ")
-    .trim();
+    .trim()
+    // Mesmo motivo do cleanText: "\" final vindo da cópia do GPT.
+    .replace(/\\+$/, "");
 }
 
 function cleanupGame(game: ParsedGame): ParsedGame {
@@ -1562,7 +1568,7 @@ export const ProgramacaoTexto = () => {
                 onChange={(e) => setSelectedDate(e.target.value)}
                 className="text-xs h-10 glass-panel border-white/[0.1]"
               />
-              <p className="text-[9px] text-muted-foreground">Usado quando o texto não contém 📅 com data</p>
+              <p className="text-[9px] text-muted-foreground">📅 Data destino: jogos sem 📅 no texto vão para <strong className="text-foreground">{formatDatePt(selectedDate)}</strong> — confira antes de colar</p>
             </div>
 
             <div className={`flex items-center gap-3 p-3 rounded-xl glass-panel border ${
@@ -1868,6 +1874,11 @@ export const ProgramacaoTexto = () => {
                   </button>
                 </div>
               </div>
+              {parsed.length > 0 && [...new Set(parsed.map((g) => g.date))].some((d) => d !== selectedDate) && (
+                <p className="rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2 text-[11px] font-semibold text-amber-300">
+                  Atenção: o texto trouxe jogos de {[...new Set(parsed.map((g) => g.date))].map(formatDatePt).join(", ")} — diferente da data selecionada ({formatDatePt(selectedDate)}). Eles vão para essas datas, não para a selecionada.
+                </p>
+              )}
               {totalWarnings > 0 && (
                 <div className="flex flex-wrap items-center gap-1.5">
                   <button

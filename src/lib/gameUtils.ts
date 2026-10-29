@@ -72,8 +72,12 @@ export const SPORT_LABEL: Record<SportType, string> = {
   esports: 'eSports',
 };
 
-/** Sports that don't have two adversarial teams (e.g. motorsport) */
-const NON_ADVERSARIAL: SportType[] = ['f1', 'tennis', 'mma', 'surf', 'cycling', 'swimming', 'golf', 'athletics', 'gymnastics'];
+/** Sports that don't have two adversarial teams (e.g. motorsport).
+ * Tênis NÃO está aqui de propósito: tênis e tênis de mesa são
+ * confrontos 1x1 — incluí-lo gerava o alerta falso "x indevido em
+ * evento único" em todo jogo de tênis e sugeria juntar o confronto
+ * num título único. */
+const NON_ADVERSARIAL: SportType[] = ['f1', 'mma', 'surf', 'cycling', 'swimming', 'golf', 'athletics', 'gymnastics'];
 export const isNonAdversarial = (st: SportType): boolean => NON_ADVERSARIAL.includes(st);
 
 /** Textual hints that an entry is a single event (no "x" between two sides). */

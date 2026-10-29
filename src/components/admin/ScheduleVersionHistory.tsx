@@ -39,6 +39,9 @@ export function ScheduleVersionHistory() {
           </div>
           {isError && <Button variant="ghost" size="sm" onClick={() => refetch()}>Tentar novamente</Button>}
         </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+          Cada publicação salva uma cópia da programação. O olho mostra os jogos salvos na versão; Restaurar substitui os jogos atuais daquelas datas pelos jogos da versão — serve para desfazer uma publicação errada.
+        </p>
 
         {isLoading ? (
           <div className="mt-4 h-16 rounded-xl skeleton-shimmer" aria-label="Carregando histórico" />
@@ -59,11 +62,11 @@ export function ScheduleVersionHistory() {
                     <p className="mt-1 truncate text-[10px] text-muted-foreground/80">{version.dates.map((date) => date.split("-").reverse().join("/")).join(", ")}</p>
                   </div>
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => setSelected(version)} aria-label="Ver jogos desta versão">
-                      <Eye className="h-4 w-4" />
+                    <Button variant="ghost" size="sm" className="h-11 px-2.5 text-[11px]" onClick={() => setSelected(version)} aria-label="Ver jogos desta versão">
+                      <Eye className="h-4 w-4 mr-1" /> Ver
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-11 w-11 text-amber-400" onClick={() => setRestoreVersion(version)} aria-label="Restaurar esta versão">
-                      <RotateCcw className="h-4 w-4" />
+                    <Button variant="ghost" size="sm" className="h-11 px-2.5 text-[11px] text-amber-400" onClick={() => setRestoreVersion(version)} aria-label="Restaurar esta versão">
+                      <RotateCcw className="h-4 w-4 mr-1" /> Restaurar
                     </Button>
                   </div>
                 </div>

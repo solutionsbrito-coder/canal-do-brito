@@ -35,10 +35,17 @@ describe("evento único no admin", () => {
   });
 
   it("esportes não-adversariais são reconhecidos", () => {
-    for (const s of ["f1", "mma", "surf", "cycling", "swimming", "golf", "tennis"] as const) {
+    for (const s of ["f1", "mma", "surf", "cycling", "swimming", "golf"] as const) {
       expect(isNonAdversarial(s)).toBe(true);
     }
     expect(isNonAdversarial("football")).toBe(false);
+  });
+
+  it("tênis é confronto (1x1), não evento único", () => {
+    // Regressão do lote Programação: tênis estava na lista de
+    // não-adversariais e todo jogo de tênis ganhava o alerta falso
+    // "x indevido em evento único".
+    expect(isNonAdversarial("tennis")).toBe(false);
   });
 
   it("detecta esporte apenas com o nome do evento", () => {
