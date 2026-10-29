@@ -1,4 +1,4 @@
-export type SportType = 'football' | 'futsal' | 'basketball' | 'tennis' | 'f1' | 'mma' | 'volleyball' | 'handball' | 'hockey' | 'baseball' | 'rugby' | 'surf' | 'cycling' | 'boxing' | 'swimming' | 'golf' | 'athletics' | 'gymnastics' | 'esports';
+export type SportType = 'football' | 'futsal' | 'basketball' | 'tennis' | 'f1' | 'mma' | 'volleyball' | 'handball' | 'hockey' | 'baseball' | 'rugby' | 'surf' | 'cycling' | 'boxing' | 'judo' | 'swimming' | 'golf' | 'athletics' | 'gymnastics' | 'esports';
 
 /** Realistic duration in minutes per sport (includes halftime, timeouts, stoppages) */
 export const SPORT_DURATION: Record<SportType, number> = {
@@ -16,6 +16,7 @@ export const SPORT_DURATION: Record<SportType, number> = {
   surf: 240,
   cycling: 300,
   boxing: 90,
+  judo: 180,
   swimming: 180,
   golf: 300,
   athletics: 180,
@@ -42,6 +43,7 @@ export const SPORT_EMOJI: Record<SportType, string> = {
   surf: '🏄',
   cycling: '🚴',
   boxing: '🥊',
+  judo: '🥋',
   swimming: '🏊',
   golf: '⛳',
   athletics: '🏃',
@@ -65,6 +67,7 @@ export const SPORT_LABEL: Record<SportType, string> = {
   surf: 'Surf',
   cycling: 'Ciclismo',
   boxing: 'Boxe',
+  judo: 'Judô',
   swimming: 'Natação',
   golf: 'Golf',
   athletics: 'Atletismo',
@@ -129,6 +132,9 @@ export function detectSportType(competition: string, teamNames?: string): SportT
   if (/\b(atp|wta|roland garros|wimbledon|us open|australian open)\b/i.test(c) || /t[eê]nis/i.test(c)) return 'tennis';
   if (/\b(f[oó]rmula[ -]?[1e]|f1|grande pr[eê]mio|automobilismo|motogp|moto2|moto3|indycar|indy nxt|stock car|e-prix|superbike|porsche|carrera cup|nascar|copa truck|truck series|motocross|mxgp)\b/i.test(c) || /\bgp\b/i.test(c)) return 'f1';
   if (/\b(ufc|bellator|pfl|mma)\b/i.test(c)) return 'mma';
+  // Sem \b final: o "ô" de "judô" não é \w em JS, e o \b após ele
+  // faria a regex nunca casar "judô".
+  if (/\b(jud[oô]|ijf)/i.test(c)) return 'judo';
   if (/\b(box[e]?|wbc|wba|wbo|ibf)\b/i.test(c)) return 'boxing';
   if (/\b(superliga|beach pro tour|elite16)\b/i.test(c) || /v[oô]lei/i.test(c) || /liga das na[çc][oõ]es.*v[oô]lei/i.test(c)) return 'volleyball';
   if (/\b(wsl|surf|pipeline|tahiti pro)\b/i.test(c)) return 'surf';

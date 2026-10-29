@@ -497,3 +497,20 @@ describe("lote Programação — barra invertida do GPT", () => {
     expect(games[0].home_team).toBe("Harimoto");
   });
 });
+
+describe("mini-lote judô — tag #judo", () => {
+  it("mapeia #judo para o tipo judo, não boxe", () => {
+    const text = [
+      "TÍTULO: 🗓️ Programação Esportiva — 30/10",
+      "",
+      "📅 Dia 30/10",
+      "",
+      "Grand Slam de Abu Dhabi — Finais",
+      "🥋 Judô / ⏰ 10h00 / #judo",
+      "📺 SporTV 2, CazéTV",
+    ].join("\n");
+    const games = parseScheduleText(text, "2026-10-30");
+    expect(games).toHaveLength(1);
+    expect(games[0].sport_type).toBe("judo");
+  });
+});

@@ -14,6 +14,7 @@ export const SPORT_THEME: Record<SportType, SportTheme> = {
   volleyball: { accent: "#fbbf24", glow: "251,191,36" },
   mma:        { accent: "#ff5252", glow: "255,82,82" },
   boxing:     { accent: "#ff5252", glow: "255,82,82" },
+  judo:       { accent: "#f97316", glow: "249,115,22" },
   f1:         { accent: "#e10600", glow: "225,6,0" },
   hockey:     { accent: "#60a5fa", glow: "96,165,250" },
   baseball:   { accent: "#f97316", glow: "249,115,22" },

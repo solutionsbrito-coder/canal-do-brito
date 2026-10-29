@@ -90,6 +90,7 @@ const SPORT_TAG_MAP: Record<string, SportType> = {
   automobilismo: 'f1', motovelocidade: 'f1', motocross: 'f1', turismo: 'f1', rally: 'f1',
   mma: 'mma', ufc: 'mma', bellator: 'mma', pfl: 'mma',
   boxe: 'boxing', boxing: 'boxing',
+  judo: 'judo',
   baseball: 'baseball', beisebol: 'baseball', mlb: 'baseball',
   rugby: 'rugby', rugbi: 'rugby',
   hoquei: 'hockey', hockey: 'hockey', nhl: 'hockey',
