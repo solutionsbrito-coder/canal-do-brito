@@ -7,6 +7,7 @@ import { getLocalDateString, SPORT_LABEL, type SportType } from "@/lib/gameUtils
 import { detectedSport } from "@/components/agenda/public/highlightsCuration";
 import { GamePremiumCard } from "@/components/agenda/public/GamePremiumCard";
 import { GlobalNotificationToggle } from "@/components/public/GlobalNotificationToggle";
+import { SegmentPushToggle } from "@/components/public/SegmentPushToggle";
 import { offsetDateStr } from "@/lib/whatsappText";
 import { Button } from "@/components/ui/button";
 
@@ -93,6 +94,10 @@ const MeusJogosTab = () => {
           não de uma conta. Visível mesmo sem follows, para o leigo
           liberar uma única vez antes de procurar um jogo. */}
       <GlobalNotificationToggle />
+
+      {/* Aviso automático: só faz sentido com follows — sem nada
+          seguido, não há segmento para avisar. */}
+      {following && <SegmentPushToggle prefs={prefs} />}
 
       {/* O que sigo */}
       {following && (

@@ -576,25 +576,37 @@ export type Database = {
           auth: string
           created_at: string
           endpoint: string
+          followed_competitions: string[]
+          followed_sports: string[]
+          followed_teams: string[]
           game_ids: string[]
           id: string
           p256dh: string
+          segment_enabled: boolean
         }
         Insert: {
           auth: string
           created_at?: string
           endpoint: string
+          followed_competitions?: string[]
+          followed_sports?: string[]
+          followed_teams?: string[]
           game_ids?: string[]
           id?: string
           p256dh: string
+          segment_enabled?: boolean
         }
         Update: {
           auth?: string
           created_at?: string
           endpoint?: string
+          followed_competitions?: string[]
+          followed_sports?: string[]
+          followed_teams?: string[]
           game_ids?: string[]
           id?: string
           p256dh?: string
+          segment_enabled?: boolean
         }
         Relationships: []
       }
@@ -870,6 +882,16 @@ export type Database = {
       }
       transfer_push_game_ids: {
         Args: { _new_endpoint: string; _old_endpoint: string }
+        Returns: boolean
+      }
+      upsert_push_preferences: {
+        Args: {
+          _competitions: string[]
+          _enabled: boolean
+          _endpoint: string
+          _sports: string[]
+          _teams: string[]
+        }
         Returns: boolean
       }
       upsert_push_subscription: {

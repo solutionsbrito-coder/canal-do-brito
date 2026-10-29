@@ -91,6 +91,26 @@ Supabase; o que está aqui é o comportamento, não o código).
   morta, a função a apaga no próximo 410/404 e o job do B3 limpa o
   resto.
 
+## Push segmentado (Meu Canal)
+
+- O visitante pode ligar o "Aviso automático" em Meu Canal: aí ele
+  recebe o aviso de 15 min antes de TODOS os jogos do que ele segue,
+  sem tocar sino em cada jogo. O interruptor vive em localStorage
+  (`canalbrito:segment-push:v1`); ligado, o app sincroniza os follows
+  para o banco por endpoint via RPC `upsert_push_preferences`
+  (colunas `followed_teams`, `followed_sports`,
+  `followed_competitions`, `segment_enabled` em `push_subscriptions`).
+  Quem não liga continua com os follows só no aparelho.
+- Na janela, a função busca também os inscritos com
+  `segment_enabled = true` e manda para os jogos que batem nos
+  follows (time, esporte ou competição, com a mesma normalização do
+  front). Sino e segmento no mesmo par mandam UM push só (o sino
+  ganha, o segmento é suprimido); a checagem do log (B4) vale para
+  os dois. Segmento não usa nem limpa `game_ids`.
+- O job diário do B3 NÃO apaga inscritos de segmento: órfã é
+  `game_ids` vazio E listas de segmento todas vazias E criada há 30+
+  dias.
+
 ## Como saber se está saudável
 
 No SQL Editor do projeto `canal-do-brito`, só leitura:
