@@ -30,6 +30,7 @@ import { sortContent, usePersistedSort, useContentSelection } from "@/components
 import { Search, Plus, Trash2, Star, ImageOff, Loader2, Sparkles, GripVertical, RefreshCw, X } from "lucide-react";
 import { toast } from "sonner";
 import { NovidadesStatsBar } from "@/components/admin/NovidadesStatsBar";
+import { isExpired, validateSchedule, toDatetimeLocal, fromDatetimeLocal } from "@/lib/newsScheduling";
 
 const TMDB_IMG = "https://image.tmdb.org/t/p/w780";
 const ratingColor = (r: number) => (r >= 7 ? "text-emerald-400" : r >= 5 ? "text-amber-400" : "text-red-400");
@@ -68,12 +69,30 @@ interface NovidadeRowProps {
   onRefresh: () => void;
   onToggle: (v: boolean) => void;
   onDelete: () => void;
+  onDatesSave: (publish_at: string | null, expires_at: string | null) => void;
 }
 
 const NovidadeRow = ({
   item: m, refreshing, disabled, selected, selectionMode, dragDisabled,
-  onSelectChange, onBadgeChange, onRefresh, onToggle, onDelete,
+  onSelectChange, onBadgeChange, onRefresh, onToggle, onDelete, onDatesSave,
 }: NovidadeRowProps) => {
+  const [publishDraft, setPublishDraft] = useState(() => toDatetimeLocal(m.publish_at));
+  const [expiresDraft, setExpiresDraft] = useState(() => toDatetimeLocal(m.expires_at));
+  const [datesError, setDatesError] = useState<string | null>(null);
+  // Sincroniza os rascunhos quando o item volta do servidor (após salvar).
+  useEffect(() => { setPublishDraft(toDatetimeLocal(m.publish_at)); }, [m.publish_at]);
+  useEffect(() => { setExpiresDraft(toDatetimeLocal(m.expires_at)); }, [m.expires_at]);
+  const datesDirty =
+    publishDraft !== toDatetimeLocal(m.publish_at) || expiresDraft !== toDatetimeLocal(m.expires_at);
+  const handleSaveDates = () => {
+    const publish_at = fromDatetimeLocal(publishDraft);
+    const expires_at = fromDatetimeLocal(expiresDraft);
+    const err = validateSchedule(publish_at, expires_at);
+    if (err) { setDatesError(err); return; }
+    setDatesError(null);
+    onDatesSave(publish_at, expires_at);
+  };
+  const publishFuture = !!m.publish_at && new Date(m.publish_at).getTime() > Date.now();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: m.id,
     disabled: disabled || dragDisabled,
@@ -155,6 +174,20 @@ const NovidadeRow = ({
               {m.seasons ? `${m.seasons} temporada${m.seasons > 1 ? "s" : ""}` : ""}
             </p>
           )}
+          {(publishFuture || m.expires_at) && (
+            <p className="text-[11px] mt-1">
+              {publishFuture && m.publish_at && (
+                <span className="text-amber-400">⏰ Publica {new Date(m.publish_at).toLocaleString("pt-BR")}</span>
+              )}
+              {publishFuture && m.expires_at && <span className="text-muted-foreground"> · </span>}
+              {isExpired(m) && m.expires_at && (
+                <span className="text-red-400">Expirada em {new Date(m.expires_at).toLocaleString("pt-BR")}</span>
+              )}
+              {!isExpired(m) && m.expires_at && (
+                <span className="text-muted-foreground">Expira {new Date(m.expires_at).toLocaleString("pt-BR")}</span>
+              )}
+            </p>
+          )}
         </div>
       </div>
 
@@ -189,6 +222,52 @@ const NovidadeRow = ({
           >
             <Trash2 className="h-4 w-4" />
           </Button>
+        </div>
+      </div>
+
+      <div className="pt-2 border-t border-white/[0.04] space-y-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <label className="space-y-1 block">
+            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">Publicar em</span>
+            <Input
+              type="datetime-local"
+              value={publishDraft}
+              onChange={(e) => setPublishDraft(e.target.value)}
+              disabled={disabled}
+              className="h-11 text-sm"
+              aria-label={`Publicar ${m.title} em`}
+            />
+          </label>
+          <label className="space-y-1 block">
+            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">Expira em</span>
+            <Input
+              type="datetime-local"
+              value={expiresDraft}
+              onChange={(e) => setExpiresDraft(e.target.value)}
+              disabled={disabled}
+              className="h-11 text-sm"
+              aria-label={`Expirar ${m.title} em`}
+            />
+          </label>
+        </div>
+        {datesError && (
+          <p className="text-[11px] text-destructive" role="alert">{datesError}</p>
+        )}
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={disabled || !datesDirty}
+            onClick={handleSaveDates}
+            className="min-h-11 text-xs"
+          >
+            Salvar datas
+          </Button>
+          {!datesDirty && (
+            <span className="text-[11px] text-muted-foreground">
+              Limpe um campo para remover a data. Publicação futura deixa o item inativo até a hora.
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -599,6 +678,13 @@ const AdminNovidades = () => {
                         onRefresh={() => handleRefreshOne(m)}
                         onToggle={(v) => toggleItem.mutate({ id: m.id, active: v })}
                         onDelete={() => setDeleteTarget(m)}
+                        onDatesSave={(publish_at, expires_at) => {
+                          // Publicação futura desativa até a hora (o job do
+                          // banco reativa e limpa o publish_at); demais casos
+                          // não mexem no interruptor.
+                          const future = !!publish_at && new Date(publish_at).getTime() > Date.now();
+                          updateItem.mutate({ id: m.id, publish_at, expires_at, ...(future ? { active: false } : {}) });
+                        }}
                       />
                     ))}
                   </div>

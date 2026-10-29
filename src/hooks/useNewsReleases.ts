@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { isVisibleToPublic } from "@/lib/newsScheduling";
 
 export interface NewsRelease {
   id: string;
@@ -20,19 +21,25 @@ export interface NewsRelease {
   seasons: number | null;
   tagline: string | null;
   backdrop_url: string | null;
+  publish_at: string | null;
+  expires_at: string | null;
 }
 
 export const useActiveNewsReleases = () =>
   useQuery({
     queryKey: ["news_releases", "active"],
     queryFn: async () => {
+      const nowIso = new Date().toISOString();
       const { data, error } = await supabase
         .from("news_releases")
         .select("*")
         .eq("active", true)
+        .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
         .order("display_order", { ascending: true });
       if (error) throw error;
-      return data as NewsRelease[];
+      // Defesa em profundidade (mesmo padrão dos banners): esconde
+      // publicações futuras que ainda estejam marcadas como ativas.
+      return (data as NewsRelease[]).filter((i) => isVisibleToPublic(i));
     },
   });
 
@@ -66,7 +73,7 @@ export const useAddNewsRelease = () => {
 export const useUpdateNewsRelease = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...fields }: { id: string } & Partial<Pick<NewsRelease, "active" | "badge_type" | "display_order" | "title" | "overview" | "genres" | "runtime" | "seasons" | "tagline" | "rating" | "image_url" | "backdrop_url">>) => {
+    mutationFn: async ({ id, ...fields }: { id: string } & Partial<Pick<NewsRelease, "active" | "badge_type" | "display_order" | "title" | "overview" | "genres" | "runtime" | "seasons" | "tagline" | "rating" | "image_url" | "backdrop_url" | "publish_at" | "expires_at">>) => {
       const { error } = await supabase.from("news_releases").update(fields).eq("id", id);
       if (error) throw error;
     },

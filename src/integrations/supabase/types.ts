@@ -528,6 +528,8 @@ export type Database = {
           title: string
           tmdb_id: number | null
           year: number | null
+          publish_at: string | null
+          expires_at: string | null
         }
         Insert: {
           active?: boolean
@@ -548,6 +550,8 @@ export type Database = {
           title: string
           tmdb_id?: number | null
           year?: number | null
+          publish_at?: string | null
+          expires_at?: string | null
         }
         Update: {
           active?: boolean
@@ -568,6 +572,8 @@ export type Database = {
           title?: string
           tmdb_id?: number | null
           year?: number | null
+          publish_at?: string | null
+          expires_at?: string | null
         }
         Relationships: []
       }
