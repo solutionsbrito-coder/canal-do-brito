@@ -6,7 +6,7 @@ import { detectSportType, SPORT_EMOJI, SPORT_LABEL, getLocalDateString, isNonAdv
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { gameKey } from "@/lib/dedup";
-import { findGameWarnings, hasWarnings, type GameWarnings } from "@/lib/gameWarnings";
+import { findGameWarnings, hasWarnings, type GameWarnings, type ExistingGameLike } from "@/lib/gameWarnings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -622,6 +622,7 @@ export const DailyGamesManager = () => {
                     <InlineEditForm
                       game={game}
                       suggestedSport={suggested}
+                      existingGames={games ?? []}
                       onSave={(updates) => {
                         if (Object.keys(updates).length === 0) {
                           setEditingId(null);
@@ -844,16 +845,19 @@ function toLocalInput(iso: string | null | undefined): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-const InlineEditForm = ({
+export const InlineEditForm = ({
   game,
   suggestedSport,
   onSave,
   onCancel,
+  existingGames,
 }: {
   game: any;
   suggestedSport?: SportType;
   onSave: (u: any) => void;
   onCancel: () => void;
+  /** Jogos do dia (o próprio é excluído pela checagem via excludeId). */
+  existingGames: ExistingGameLike[];
 }) => {
   const [home, setHome] = useState(game.home_team ?? "");
   const [away, setAway] = useState(game.away_team ?? "");
@@ -909,9 +913,38 @@ const InlineEditForm = ({
 
   const isDirty = Object.keys(buildUpdates()).length > 0;
 
-  const handleSave = () => {
+  const [warnings, setWarnings] = useState<GameWarnings | null>(null);
+
+  const handleSave = (force = false) => {
     if (error) return;
-    onSave(buildUpdates());
+    const updates = buildUpdates();
+    if (Object.keys(updates).length === 0) {
+      onSave(updates);
+      return;
+    }
+    // Mesmo aviso do cadastro avulso, aplicado à edição: duplicata
+    // provável ou conflito de horário pedem confirmação, sem travar.
+    // A checagem filtra pela data editada, então mudar o jogo de dia
+    // não gera falso aviso contra o dia antigo (o dia novo não está
+    // carregado aqui) — limitação documentada, não um falso positivo.
+    if (!force) {
+      const found = findGameWarnings(
+        existingGames.filter((g: ExistingGameLike & { archived?: boolean }) => !g.archived),
+        {
+          date,
+          home_team: trimmedHome,
+          away_team: singleEvent ? "" : trimmedAway,
+          game_time: time,
+        },
+        game.id,
+      );
+      if (hasWarnings(found)) {
+        setWarnings(found);
+        return;
+      }
+    }
+    setWarnings(null);
+    onSave(updates);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -1047,10 +1080,40 @@ const InlineEditForm = ({
         </p>
       )}
 
+      {warnings && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 space-y-2" role="alert">
+          <p className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+            <AlertTriangle className="h-3.5 w-3.5" /> Atenção — já existe algo parecido neste dia:
+          </p>
+          {warnings.duplicates.length > 0 && (
+            <p className="text-xs text-white/85">
+              <span className="font-bold">Duplicata provável:</span> {warnings.duplicates.join("; ")}
+            </p>
+          )}
+          {warnings.timeConflicts.length > 0 && (
+            <p className="text-xs text-white/85">
+              <span className="font-bold">Mesmo horário:</span> {warnings.timeConflicts.join("; ")}
+            </p>
+          )}
+          <p className="text-[11px] text-white/60">
+            Isso é só um aviso — você pode salvar mesmo assim. Se preferir, clique em Revisar, ajuste os
+            campos e clique em Salvar novamente para rechecar.
+          </p>
+          <div className="flex gap-2 pt-1">
+            <Button size="sm" onClick={() => handleSave(true)} className="h-8 text-xs bg-amber-600 hover:bg-amber-600/90">
+              Salvar mesmo assim
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setWarnings(null)} className="h-8 text-xs">
+              Revisar
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-2 pt-1">
         <Button
           size="sm"
-          onClick={handleSave}
+          onClick={() => handleSave(false)}
           disabled={!!error || !isDirty}
           className="min-h-11 text-xs bg-emerald-600 hover:bg-emerald-600/90"
         >
