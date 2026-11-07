@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseScheduleText } from "../ProgramacaoTexto";
+import { parseScheduleText, buildPreviewRows } from "../ProgramacaoTexto";
 
 describe("parseScheduleText", () => {
   const fallback = "2026-03-19";
@@ -513,5 +513,55 @@ describe("mini-lote judô — tag #judo", () => {
     const games = parseScheduleText(text, "2026-10-30");
     expect(games).toHaveLength(1);
     expect(games[0].sport_type).toBe("judo");
+  });
+});
+
+describe("buildPreviewRows (prévia antes de Processar)", () => {
+  const base = {
+    competition: "NBA",
+    competition_detail: "",
+    channels: ["ESPN 2"],
+    is_womens: false,
+    selected: true,
+  } as const;
+
+  it("dawn game shows the effective D+1 instant and is flagged", () => {
+    const rows = buildPreviewRows([
+      { ...base, home_team: "Portland Trail Blazers", away_team: "San Antonio Spurs", date: "2026-11-07", game_time: "00:00" },
+    ]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].teams).toBe("Portland Trail Blazers x San Antonio Spurs");
+    expect(rows[0].date).toBe("2026-11-07");
+    expect(rows[0].gameTime).toBe("00:00");
+    expect(rows[0].effectiveLabel).toBe("08/11 00:00");
+    expect(rows[0].isDawn).toBe(true);
+  });
+
+  it("daytime game shows the same-day effective instant and is not flagged", () => {
+    const rows = buildPreviewRows([
+      { ...base, home_team: "Flamengo", away_team: "Palmeiras", date: "2026-11-07", game_time: "20:00" },
+    ]);
+    expect(rows[0].effectiveLabel).toBe("07/11 20:00");
+    expect(rows[0].isDawn).toBe(false);
+  });
+
+  it("rows are sorted by effective start — dawn games last", () => {
+    const rows = buildPreviewRows([
+      { ...base, home_team: "Portland Trail Blazers", away_team: "San Antonio Spurs", date: "2026-11-07", game_time: "00:00" },
+      { ...base, home_team: "Flamengo", away_team: "Palmeiras", date: "2026-11-07", game_time: "20:00" },
+      { ...base, home_team: "Pumas", away_team: "América-MEX", date: "2026-11-07", game_time: "00:10" },
+      { ...base, home_team: "Brasil", away_team: "Argentina", date: "2026-11-07", game_time: "10:00" },
+    ]);
+    expect(rows.map((r) => r.gameTime)).toEqual(["10:00", "20:00", "00:00", "00:10"]);
+    expect(rows.map((r) => r.effectiveLabel)).toEqual(["07/11 10:00", "07/11 20:00", "08/11 00:00", "08/11 00:10"]);
+  });
+
+  it("single event (no away team) shows only the home team", () => {
+    const rows = buildPreviewRows([
+      { ...base, home_team: "Abu Dhabi Championship — 3a Rodada", away_team: "", date: "2026-11-07", game_time: "04:00" },
+    ]);
+    expect(rows[0].teams).toBe("Abu Dhabi Championship — 3a Rodada");
+    expect(rows[0].effectiveLabel).toBe("08/11 04:00");
+    expect(rows[0].isDawn).toBe(true);
   });
 });

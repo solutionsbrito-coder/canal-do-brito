@@ -330,6 +330,12 @@ const AdminProgramacao = () => {
   const [activeSection, setActiveSection] = useState<Section>(initialTab);
 
   const [selectedCategory, setSelectedCategory] = useState<BannerCategory>("cover");
+  // Single source of truth for the programming date: the paste flow
+  // (ProgramacaoTexto, "Data dos jogos") and the published list
+  // (DailyGamesManager, "Data da programação") used to keep independent
+  // dates, so a game could be pasted for one day while the list showed
+  // another. Both controls now read/write this one value.
+  const [programmingDate, setProgrammingDate] = useState(() => getLocalDateString());
   const { data: banners, isLoading } = useAllBanners(selectedCategory);
   const { data: allBanners } = useAllBanners();
   const countsByCategory = useMemo(() => {
@@ -693,9 +699,9 @@ const AdminProgramacao = () => {
               </PopoverContent>
             </Popover>
           </div>
-          <ProgramacaoTexto />
+          <ProgramacaoTexto selectedDate={programmingDate} onSelectedDateChange={setProgrammingDate} />
           <ScheduleVersionHistory />
-          <DailyGamesManager />
+          <DailyGamesManager selectedDate={programmingDate} onSelectedDateChange={setProgrammingDate} />
           <ArchivedGamesManager />
         </div>
       )}

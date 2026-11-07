@@ -41,10 +41,10 @@ vi.mock("@/hooks/useBanners", () => ({
 }));
 
 vi.mock("@/components/admin/ProgramacaoTexto", () => ({
-  ProgramacaoTexto: () => <div>ProgramacaoTexto</div>,
+  ProgramacaoTexto: (props: any) => <div data-testid="programacao-texto" data-selected-date={props.selectedDate}>ProgramacaoTexto</div>,
 }));
 vi.mock("@/components/admin/DailyGamesManager", () => ({
-  DailyGamesManager: () => <div>DailyGamesManager</div>,
+  DailyGamesManager: (props: any) => <div data-testid="daily-games-manager" data-selected-date={props.selectedDate}>DailyGamesManager</div>,
 }));
 vi.mock("@/components/admin/ArchivedGamesManager", () => ({
   ArchivedGamesManager: () => <div>ArchivedGamesManager</div>,
@@ -88,6 +88,15 @@ describe("AdminProgramacao — sections & categories", () => {
     render(<AdminProgramacao />, { wrapper });
     fireEvent.click(screen.getByText("📋 Programação"));
     expect(screen.getByText("ProgramacaoTexto")).toBeInTheDocument();
+  });
+
+  it("paste flow and published list share one programming date", () => {
+    render(<AdminProgramacao />, { wrapper });
+    fireEvent.click(screen.getByText("📋 Programação"));
+    const pasteDate = screen.getByTestId("programacao-texto").getAttribute("data-selected-date");
+    const listDate = screen.getByTestId("daily-games-manager").getAttribute("data-selected-date");
+    expect(pasteDate).toBeTruthy();
+    expect(listDate).toBe(pasteDate);
   });
 
   it("renders all category pills", () => {
