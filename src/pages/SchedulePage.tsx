@@ -13,6 +13,7 @@ import { useRealtimeDailyGames } from "@/hooks/useRealtimeDailyGames";
 import { useLiveTick } from "@/hooks/useLiveTick";
 import {
   getLocalDateString,
+  getGameTimestamp,
   isGameCurrentlyLive,
   SPORT_EMOJI,
   SPORT_LABEL,
@@ -58,7 +59,11 @@ const SchedulePage = () => {
       sportFilter === "all"
         ? games
         : games.filter((g) => (g.sport_type || "football") === sportFilter);
-    return [...list].sort((a, b) => a.game_time.localeCompare(b.game_time));
+    // Ordena pelo instante efetivo (dia esportivo): jogos de madrugada
+    // (00:00–04:59) acontecem no fim do dia e vão por último na lista.
+    return [...list].sort(
+      (a, b) => getGameTimestamp(a.date, a.game_time).getTime() - getGameTimestamp(b.date, b.game_time).getTime(),
+    );
   }, [games, sportFilter]);
 
   const humanDate = format(new Date(activeDate + "T12:00:00"), "EEEE, d 'de' MMMM", {

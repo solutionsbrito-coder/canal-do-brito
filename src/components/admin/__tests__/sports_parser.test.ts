@@ -194,60 +194,57 @@ describe("splitChannels — separadores múltiplos", () => {
   });
 });
 
-describe("Auto-bump date for dawn games (00:00–04:59) — opt-in via flag", () => {
-  const BUMP = { autoBumpMidnight: true };
+describe("Sports day: dawn games (00:00–04:59) keep the programming date", () => {
+  // A data gravada nunca muda: a madrugada vale o fim do dia da programação
+  // (o instante efetivo D+1 é calculado em getGameTimestamp, em gameUtils).
 
-  it("bumps date +1 for 00:00 game when flag is ON and date comes from header", () => {
+  it("keeps the header date for a 00:00 game", () => {
     const text = `📅 Dia 04/04
 
 Santos Laguna x América-MEX
 🏆 Liga MX
 ⏰ 00h00
 📺 ESPN`;
-    const result = parseScheduleText(text, "2026-04-04", BUMP);
+    const result = parseScheduleText(text, "2026-04-04");
     expect(result).toHaveLength(1);
-    expect(result[0].date).toBe("2026-04-05");
-    expect(result[0].dateBumped).toBe(true);
+    expect(result[0].date).toBe("2026-04-04");
   });
 
-  it("bumps date +1 for 02:30 game when flag is ON", () => {
+  it("keeps the header date for a 02:30 game", () => {
     const text = `📅 Dia 04/04
 
 LA Galaxy x Inter Miami
 🏆 MLS
 ⏰ 02h30
 📺 Apple TV`;
-    const result = parseScheduleText(text, "2026-04-04", BUMP);
+    const result = parseScheduleText(text, "2026-04-04");
     expect(result).toHaveLength(1);
-    expect(result[0].date).toBe("2026-04-05");
-    expect(result[0].dateBumped).toBe(true);
+    expect(result[0].date).toBe("2026-04-04");
   });
 
-  it("does NOT bump date for 05:00+ games even with flag ON", () => {
+  it("keeps the date for 05:00+ games", () => {
     const text = `📅 Dia 04/04
 
 Arsenal x Chelsea
 🏆 Premier League
 ⏰ 08h30
 📺 ESPN`;
-    const result = parseScheduleText(text, "2026-04-04", BUMP);
+    const result = parseScheduleText(text, "2026-04-04");
     expect(result).toHaveLength(1);
     expect(result[0].date).toBe("2026-04-04");
-    expect(result[0].dateBumped).toBeFalsy();
   });
 
-  it("does NOT bump when date is from fallback (manual picker)", () => {
+  it("keeps the fallback date for a 00:00 game (manual picker)", () => {
     const text = `Santos Laguna x América-MEX
 🏆 Liga MX
 ⏰ 00h00
 📺 ESPN`;
-    const result = parseScheduleText(text, "2026-04-05", BUMP);
+    const result = parseScheduleText(text, "2026-04-05");
     expect(result).toHaveLength(1);
     expect(result[0].date).toBe("2026-04-05");
-    expect(result[0].dateBumped).toBeFalsy();
   });
 
-  it("handles mixed dawn and normal games correctly with flag ON", () => {
+  it("handles mixed dawn and normal games: both keep the header date", () => {
     const text = `📅 Dia 04/04
 
 Flamengo x Palmeiras
@@ -259,15 +256,13 @@ Santos Laguna x América-MEX
 🏆 Liga MX
 ⏰ 00h00
 📺 ESPN`;
-    const result = parseScheduleText(text, "2026-04-04", BUMP);
+    const result = parseScheduleText(text, "2026-04-04");
     expect(result).toHaveLength(2);
     expect(result[0].date).toBe("2026-04-04");
-    expect(result[0].dateBumped).toBeFalsy();
-    expect(result[1].date).toBe("2026-04-05");
-    expect(result[1].dateBumped).toBe(true);
+    expect(result[1].date).toBe("2026-04-04");
   });
 
-  it("DEFAULT (flag OFF): madrugada keeps the header date — prevents the 02/05 bug", () => {
+  it("madrugada keeps the header date — prevents the 02/05 bug", () => {
     const text = `📅 Dia 04/04
 
 Formula E - GP de Miami - Treino
@@ -277,7 +272,6 @@ Formula E - GP de Miami - Treino
     const result = parseScheduleText(text, "2026-04-04");
     expect(result).toHaveLength(1);
     expect(result[0].date).toBe("2026-04-04");
-    expect(result[0].dateBumped).toBeFalsy();
   });
 });
 

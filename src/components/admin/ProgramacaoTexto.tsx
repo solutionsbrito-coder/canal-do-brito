@@ -7,7 +7,7 @@ import { useChannelMappings } from "@/hooks/useChannelMappings";
 import { Checkbox } from "@/components/ui/checkbox";
 import { gameKey } from "@/lib/dedup";
 import { isChannelFragment } from "@/components/public/channelLogos";
-import { getLocalDateString, midnightInSaoPaulo } from "@/lib/gameUtils";
+import { getLocalDateString, midnightInSaoPaulo, isDawnGame, getEffectiveGameDate } from "@/lib/gameUtils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -38,7 +38,6 @@ export interface ParsedGame {
   sport_type?: SportType;
   /** Como o esporte foi classificado: tag explícita, emoji, cabeçalho de seção, texto ou padrão */
   sportSource?: "tag" | "emoji" | "seção" | "texto" | "padrão";
-  dateBumped?: boolean;
 }
 
 const PLACEHOLDER = `Cole aqui a programação do dia...
@@ -394,13 +393,6 @@ function collectMetadata(lines: string[], startIdx: number): {
   return { competition, competition_detail, game_time, channels, sport_type, tag_sport, linesConsumed: consumed };
 }
 
-/** Advance a YYYY-MM-DD date by 1 day */
-function bumpDate(dateStr: string): string {
-  const d = new Date(dateStr + "T12:00:00"); // noon to avoid DST issues
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
-}
-
 // ============================================================
 // FORMAT C — inline pre-processor
 // Converts WhatsApp messages that look like:
@@ -648,9 +640,7 @@ export function explodeSingleLineEvents(text: string): string {
 export function parseScheduleText(
   text: string,
   fallbackDate: string,
-  options: { autoBumpMidnight?: boolean } = {}
 ): ParsedGame[] {
-  const { autoBumpMidnight = false } = options;
   // Normalize Unicode to avoid invisible chars (NBSP, ZWJ, BOM) breaking regex boundaries
   const normalized = text
     .normalize("NFKC")
@@ -660,7 +650,6 @@ export function parseScheduleText(
   const lines = preprocessed.split("\n").map((l) => l.trim()).filter(Boolean);
   const games: ParsedGame[] = [];
   let currentDate = fallbackDate;
-  let dateFromHeader = false; // track if currentDate came from a 📅 header
   let currentSectionSport: SportType | null = null;
 
   let i = 0;
@@ -674,7 +663,6 @@ export function parseScheduleText(
       const month = dateMatch[2].padStart(2, "0");
       const year = new Date().getFullYear();
       currentDate = `${year}-${month}-${day}`;
-      dateFromHeader = true;
       i++;
       continue;
     }
@@ -688,7 +676,6 @@ export function parseScheduleText(
         const month = headerDateMatch[2].padStart(2, "0");
         const year = new Date().getFullYear();
         currentDate = `${year}-${month}-${day}`;
-        dateFromHeader = true;
         i++;
         continue;
       }
@@ -812,14 +799,11 @@ export function parseScheduleText(
       }
 
 
-      // Auto-bump: opt-in. Só avança a data se o usuário ligou explicitamente
-      // o toggle "Madrugada conta para o dia anterior" no admin.
-      let gameDate = currentDate;
-      let dateBumped = false;
-      if (autoBumpMidnight && dateFromHeader && meta.game_time < "05:00") {
-        gameDate = bumpDate(currentDate);
-        dateBumped = true;
-      }
+      // Dia esportivo: a data gravada é sempre o dia da programação, sem
+      // ajuste. Jogos de madrugada (00:00–04:59) acontecem no FIM desse dia
+      // (D+1 no relógio) — o instante efetivo é calculado em
+      // getGameTimestamp (gameUtils), não mudando a data aqui.
+      const gameDate = currentDate;
 
       games.push(cleanupGame({
         home_team, away_team,
@@ -830,7 +814,6 @@ export function parseScheduleText(
         is_womens, date: gameDate, selected: true,
         sport_type: finalSport,
         sportSource,
-        dateBumped,
       }));
 
       i += 1 + meta.linesConsumed;
@@ -866,11 +849,11 @@ function getGameWarnings(game: ParsedGame, ctx: WarningCtx = {}): GameWarning[] 
 
   if (!game.game_time) {
     warnings.push({ code: "no-time", label: "Sem horário", level: "error" });
-  } else if (game.dateBumped) {
-    const [, m, d] = game.date.split("-");
-    warnings.push({ code: "bumped", label: `⏰ ${game.game_time} (madrugada) — data avançada para ${d}/${m}`, level: "warn" });
-  } else if (game.game_time === "00:00") {
-    warnings.push({ code: "midnight", label: "⏰ Horário 00:00 — confira a data", level: "warn" });
+  } else if (isDawnGame(game.game_time)) {
+    // Dia esportivo: a madrugada vale o fim do dia da programação.
+    const effDate = getEffectiveGameDate(game.date, game.game_time);
+    const [, m, d] = effDate.split("-");
+    warnings.push({ code: "dawn", label: `🌙 ${game.game_time} (madrugada) — fim do dia: acontece em ${d}/${m} às ${game.game_time} (Brasília), por último na lista`, level: "warn" });
   }
 
   if (!game.channels.length) {
@@ -975,12 +958,6 @@ export const ProgramacaoTexto = () => {
   const [parsed, setParsed] = useState<ParsedGame[]>([]);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [scheduleMidnight, setScheduleMidnight] = useState(false);
-  // Auto-bump default OFF — empurrar madrugada para +1 dia só quando o WhatsApp
-  // realmente usa a convenção de "dia esportivo". Persiste a preferência local.
-  const [autoBumpMidnight, setAutoBumpMidnight] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("admin_auto_bump_midnight") === "true";
-  });
   const [readingImage, setReadingImage] = useState(false);
   const [pendingImage, setPendingImage] = useState<{ file: File; preview: string } | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -996,7 +973,7 @@ export const ProgramacaoTexto = () => {
     try {
       const raw = localStorage.getItem("admin_schedule_draft_v1");
       if (!raw) return;
-      const draft = JSON.parse(raw) as { text?: string; selectedDate?: string; scheduleMidnight?: boolean; autoBumpMidnight?: boolean };
+      const draft = JSON.parse(raw) as { text?: string; selectedDate?: string; scheduleMidnight?: boolean };
       if (draft.text?.trim()) setDraftAvailable(true);
     } catch {
       localStorage.removeItem("admin_schedule_draft_v1");
@@ -1012,21 +989,20 @@ export const ProgramacaoTexto = () => {
           setDraftAvailable(false);
           return;
         }
-        localStorage.setItem("admin_schedule_draft_v1", JSON.stringify({ text, selectedDate, scheduleMidnight, autoBumpMidnight, savedAt: new Date().toISOString() }));
+        localStorage.setItem("admin_schedule_draft_v1", JSON.stringify({ text, selectedDate, scheduleMidnight, savedAt: new Date().toISOString() }));
       } catch { /* storage unavailable */ }
     }, 500);
     return () => window.clearTimeout(id);
-  }, [text, selectedDate, scheduleMidnight, autoBumpMidnight, draftAvailable]);
+  }, [text, selectedDate, scheduleMidnight, draftAvailable]);
 
   const restoreDraft = () => {
     try {
       const raw = localStorage.getItem("admin_schedule_draft_v1");
       if (!raw) return;
-      const draft = JSON.parse(raw) as { text?: string; selectedDate?: string; scheduleMidnight?: boolean; autoBumpMidnight?: boolean };
+      const draft = JSON.parse(raw) as { text?: string; selectedDate?: string; scheduleMidnight?: boolean };
       setText(draft.text ?? "");
       if (draft.selectedDate) setSelectedDate(draft.selectedDate);
       setScheduleMidnight(Boolean(draft.scheduleMidnight));
-      setAutoBumpMidnight(Boolean(draft.autoBumpMidnight));
       setParsed([]);
       setDraftAvailable(false);
       toast.success("Rascunho restaurado");
@@ -1046,7 +1022,7 @@ export const ProgramacaoTexto = () => {
       toast.error("Cole o texto da programação primeiro");
       return;
     }
-    const games = parseScheduleText(text, selectedDate, { autoBumpMidnight });
+    const games = parseScheduleText(text, selectedDate);
     if (games.length === 0) {
       toast.error("Nenhum jogo detectado. Verifique o formato do texto.");
       return;
@@ -1229,12 +1205,12 @@ export const ProgramacaoTexto = () => {
     if (!text.trim()) { setLiveCount(0); return; }
     const t = setTimeout(() => {
       try {
-        const games = parseScheduleText(text, selectedDate, { autoBumpMidnight });
+        const games = parseScheduleText(text, selectedDate);
         setLiveCount(games.length);
       } catch { setLiveCount(0); }
     }, 400);
     return () => clearTimeout(t);
-  }, [text, selectedDate, autoBumpMidnight]);
+  }, [text, selectedDate]);
 
   const isDateInPast = (dateStr: string): boolean => {
     const midnight = midnightInSaoPaulo(dateStr);
@@ -1242,18 +1218,28 @@ export const ProgramacaoTexto = () => {
   };
 
   const getScheduleLabel = (): { text: string; isPast: boolean } => {
-    const [, m, d] = selectedDate.split("-");
-    const past = isDateInPast(selectedDate);
+    // Usa as datas dos jogos selecionados (não só a "Data dos jogos"): o
+    // texto pode trazer vários 📅, e o rótulo precisa dizer de quais dias.
+    const dates = [...new Set(parsed.filter((g) => g.selected).map((g) => g.date))];
+    const labelDates = dates.length > 0 ? dates : [selectedDate];
+    const fmt = (ds: string) => {
+      const [, m, d] = ds.split("-");
+      const wd = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "short" })
+        .format(new Date(`${ds}T12:00:00-03:00`))
+        .replace(".", "");
+      return `${wd}, ${d}/${m}`;
+    };
+    const past = labelDates.every(isDateInPast);
     return {
       text: past
-        ? "⚠️ Data no passado — será publicado imediatamente"
-        : `Ativa em ${d}/${m} às 00:00`,
+        ? "⚠️ Meia-noite já passou — será publicado imediatamente"
+        : `Ativa em ${labelDates.map(fmt).join(" e ")} às 00:00 (Brasília)`,
       isPast: past,
     };
   };
 
   const buildInsertPayload = (selected: ParsedGame[]) => {
-    return selected.map(({ selected: _, sport_type: parsedSport, dateBumped: _bump, ...g }) => {
+    return selected.map(({ selected: _, sport_type: parsedSport, ...g }) => {
       let publishAt: string | null = null;
       let active = true;
 
@@ -1263,6 +1249,9 @@ export const ProgramacaoTexto = () => {
           publishAt = midnight.toISOString();
           active = false;
         }
+        // Se a meia-noite já passou, o jogo publica agora (active=true,
+        // publish_at=null). O rótulo acima e o aviso em executePublish
+        // deixam isso explícito — nunca em silêncio.
       }
 
       const finalSportType = parsedSport || detectSportType(g.competition, `${g.home_team} ${g.away_team}`);
@@ -1289,8 +1278,7 @@ export const ProgramacaoTexto = () => {
   const [midnightConfirmOpen, setMidnightConfirmOpen] = useState(false);
   const [pendingPublishAction, setPendingPublishAction] = useState<"publish" | "republish" | null>(null);
 
-  const midnightGamesCount = parsed.filter((g) => g.selected && g.game_time < "05:00" && !g.dateBumped).length;
-  const bumpedGamesCount = parsed.filter((g) => g.selected && g.dateBumped).length;
+  const midnightGamesCount = parsed.filter((g) => g.selected && g.game_time < "05:00").length;
 
   const executePublish = async () => {
     const selected = parsed.filter((g) => g.selected);
@@ -1358,7 +1346,7 @@ export const ProgramacaoTexto = () => {
       toast.error("Selecione pelo menos um jogo");
       return;
     }
-    if (midnightGamesCount > 0 || bumpedGamesCount > 0) {
+    if (midnightGamesCount > 0) {
       setPendingPublishAction("publish");
       setMidnightConfirmOpen(true);
       return;
@@ -1402,7 +1390,7 @@ export const ProgramacaoTexto = () => {
     if (insertGames.isPending || deleteByDate.isPending) return; // anti double-click guard
     const selected = parsed.filter((g) => g.selected);
     if (selected.length === 0) return;
-    if (midnightGamesCount > 0 || bumpedGamesCount > 0) {
+    if (midnightGamesCount > 0) {
       setPendingPublishAction("republish");
       setMidnightConfirmOpen(true);
       return;
@@ -1587,31 +1575,22 @@ export const ProgramacaoTexto = () => {
                     {getScheduleLabel().text}
                   </p>
                 ) : (
-                  <p className="text-[9px] text-muted-foreground leading-tight">Publica à meia-noite da data dos jogos</p>
+                  <p className="text-[9px] text-muted-foreground leading-tight">Publica agora, imediatamente (sem agendamento)</p>
                 )}
               </div>
               <Switch checked={scheduleMidnight} onCheckedChange={setScheduleMidnight} />
             </div>
 
             <div className="sm:col-span-2 flex items-center gap-3 p-3 rounded-xl glass-panel border border-white/[0.08]">
-              <AlertTriangle className={`h-4 w-4 shrink-0 ${autoBumpMidnight ? "text-amber-400" : "text-muted-foreground"}`} />
+              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
               <div className="flex-1 min-w-0">
                 <p className="text-[11px] font-semibold text-foreground">
-                  Madrugada conta para o dia anterior
+                  Madrugada vale o fim do dia
                 </p>
                 <p className="text-[9px] text-muted-foreground leading-tight">
-                  {autoBumpMidnight
-                    ? "Jogos < 05:00 sob um cabeçalho 📅 serão movidos para o dia seguinte (+1)."
-                    : "OFF (recomendado): a data do cabeçalho 📅 é usada exatamente como está."}
+                  Jogos das 00:00 às 04:59 acontecem no fim do dia da programação (ex.: 00:00 de 07/11 vale 08/11 às 00:00, Brasília) e aparecem por último na lista do dia. A data gravada não muda.
                 </p>
               </div>
-              <Switch
-                checked={autoBumpMidnight}
-                onCheckedChange={(v) => {
-                  setAutoBumpMidnight(v);
-                  try { localStorage.setItem("admin_auto_bump_midnight", String(v)); } catch {}
-                }}
-              />
             </div>
           </div>
         </div>
@@ -2284,16 +2263,12 @@ export const ProgramacaoTexto = () => {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-500" />
-              Jogos com horário 00:00
+              Jogos de madrugada (00:00–04:59)
             </AlertDialogTitle>
             <AlertDialogDescription>
               {midnightGamesCount > 0 && (
-                <>{midnightGamesCount} jogo(s) selecionado(s) com horário antes das <strong>05:00</strong> sem ajuste automático de data.
-                Jogos de madrugada podem aparecer como "Ao Vivo" no dia errado.
-                <br /><br /></>
-              )}
-              {bumpedGamesCount > 0 && (
-                <>{bumpedGamesCount} jogo(s) tiveram a data avançada automaticamente (+1 dia) por serem de madrugada.
+                <>{midnightGamesCount} jogo(s) selecionado(s) com horário antes das <strong>05:00</strong>.
+                Pela regra do dia esportivo, eles acontecem no <strong>fim do dia da programação</strong> (ex.: 00:00 de 07/11 vale 08/11 às 00:00, Brasília) e aparecem por último na lista do dia — a data gravada não muda.
                 <br /><br /></>
               )}
               <strong>Verifique as datas no preview</strong> antes de confirmar.

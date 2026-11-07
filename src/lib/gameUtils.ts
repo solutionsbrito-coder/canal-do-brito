@@ -174,14 +174,45 @@ export function getTomorrowDateString(): string {
 }
 
 /**
+ * Cutoff for the "sports day" (dia esportivo): games before 05:00 belong to
+ * the previous day's programming — they happen at the END of that day, not
+ * at the start of the calendar day they are listed under.
+ */
+export const DAWN_CUTOFF = "05:00";
+
+/** Returns true for dawn games (00:00–04:59) — the ones the sports-day rule applies to. */
+export function isDawnGame(gameTime: string): boolean {
+  return (gameTime || "00:00").slice(0, 5) < DAWN_CUTOFF;
+}
+
+/**
  * Returns an absolute Date for a game given its date (YYYY-MM-DD) and time (HH:MM)
  * in the America/Sao_Paulo timezone (UTC-3).
+ *
+ * Sports-day rule: `gameDate` is the programming day. A game at 00:00–04:59
+ * listed under day D happens at the END of day D, i.e. D+1 at that clock
+ * time (e.g. 00:00 on 07/11 is 08/11 00:00, Brasília). The stored `date`
+ * never changes — only the effective instant moves, so the game keeps
+ * showing on day D's list, last, in sequence.
  */
-function getGameTimestamp(gameDate: string, gameTime: string): Date {
+export function getGameTimestamp(gameDate: string, gameTime: string): Date {
   const [h, m] = (gameTime || "00:00").split(":").map(Number);
-  return new Date(
-    `${gameDate}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00-03:00`
-  );
+  const hh = String(h).padStart(2, "0");
+  const mm = String(m).padStart(2, "0");
+  // Noon anchored in São Paulo (-03:00) so the +1 day shift is independent
+  // of the machine's local timezone.
+  const d = new Date(`${gameDate}T12:00:00-03:00`);
+  if (isDawnGame(gameTime)) d.setUTCDate(d.getUTCDate() + 1);
+  const effectiveDate = d.toISOString().slice(0, 10);
+  return new Date(`${effectiveDate}T${hh}:${mm}:00-03:00`);
+}
+
+/**
+ * Effective (sports-day) date of a game as YYYY-MM-DD in America/Sao_Paulo:
+ * D+1 for dawn games (00:00–04:59), D otherwise.
+ */
+export function getEffectiveGameDate(gameDate: string, gameTime: string): string {
+  return getLocalDateString(getGameTimestamp(gameDate, gameTime));
 }
 
 /**

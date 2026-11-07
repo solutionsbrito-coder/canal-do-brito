@@ -261,10 +261,11 @@ China x Curaçao
 ⏰ 03:00
 📺 DAZN`;
 
-    const games = parseScheduleText(text, fallback, { autoBumpMidnight: true });
+    const games = parseScheduleText(text, fallback);
     expect(games).toHaveLength(1);
-    // Auto-bump (opt-in): 03:00 is dawn, so date advances to next day (28/03)
-    expect(games[0].date).toBe(`${new Date().getFullYear()}-03-28`);
+    // Sports day: 03:00 is dawn, so it keeps the header date (27/03) — the
+    // effective instant (28/03 03:00) is computed in getGameTimestamp.
+    expect(games[0].date).toBe(`${new Date().getFullYear()}-03-27`);
   });
 
   it("handles full real-world agenda with multiple sports", () => {
@@ -302,11 +303,11 @@ Miami Open
 ⏰ 16:00
 📺 ESPN 2`;
 
-    const games = parseScheduleText(text, fallback, { autoBumpMidnight: true });
+    const games = parseScheduleText(text, fallback);
     expect(games).toHaveLength(4);
     expect(games[0].home_team).toBe("China");
-    // Auto-bump (opt-in): 03:00 is dawn → date becomes 28/03
-    expect(games[0].date).toBe(`${new Date().getFullYear()}-03-28`);
+    // Sports day: 03:00 is dawn → keeps the header date (27/03)
+    expect(games[0].date).toBe(`${new Date().getFullYear()}-03-27`);
     expect(games[1].home_team).toBe("Inglaterra");
     expect(games[1].date).toBe(`${new Date().getFullYear()}-03-27`); // 16:45 — no bump
     expect(games[1].channels).toEqual(["ESPN", "Disney+"]);

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAllDailyGames, useUpdateDailyGame, useDeleteDailyGame, useInsertDailyGames, useDeleteDailyGamesByDate, normalizeChannelsList } from "@/hooks/useDailyGames";
 import { formatCountdown } from "@/lib/dateUtils";
-import { detectSportType, SPORT_EMOJI, SPORT_LABEL, getLocalDateString, isNonAdversarial, type SportType } from "@/lib/gameUtils";
+import { detectSportType, SPORT_EMOJI, SPORT_LABEL, getLocalDateString, isDawnGame, getEffectiveGameDate, isNonAdversarial, type SportType } from "@/lib/gameUtils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { gameKey } from "@/lib/dedup";
@@ -845,6 +845,12 @@ function toLocalInput(iso: string | null | undefined): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+/** "2026-11-07" -> "07/11" */
+const formatDayMonth = (ds: string): string => {
+  const [, m, d] = ds.split("-");
+  return `${d}/${m}`;
+};
+
 export const InlineEditForm = ({
   game,
   suggestedSport,
@@ -1015,6 +1021,12 @@ export const InlineEditForm = ({
         </Field>
       </div>
 
+      {validTime && isDawnGame(time) && date && (
+        <p className="text-[11px] text-amber-400">
+          🌙 Madrugada: acontece em {formatDayMonth(getEffectiveGameDate(date, time))} às {time} (Brasília), por último na lista do dia {formatDayMonth(date)}.
+        </p>
+      )}
+
       <Field label="Canais (separados por vírgula)">
         <Input value={channels} onChange={(e) => setChannels(e.target.value)} maxLength={300} placeholder="Globo, SporTV" className="h-11 text-sm" />
       </Field>
@@ -1143,8 +1155,10 @@ const AddGameForm = ({
   const [away, setAway] = useState("");
   const [comp, setComp] = useState("");
   const [time, setTime] = useState("");
+  const [formDate, setFormDate] = useState(date);
   const [channels, setChannels] = useState("");
   const [sportMode, setSportMode] = useState<"auto" | SportType>("auto");
+  const validAddTime = /^\d{2}:\d{2}$/.test(time);
   /** Avisos do Lote 1: exibidos antes de inserir; nunca bloqueiam sozinhos. */
   const [warnings, setWarnings] = useState<GameWarnings | null>(null);
 
@@ -1162,7 +1176,7 @@ const AddGameForm = ({
     if (!force) {
       const found = findGameWarnings(
         (existingGames ?? []).filter((g: any) => !g.archived),
-        { date, home_team: trimmedHome, away_team: trimmedAway, game_time: time },
+        { date: formDate, home_team: trimmedHome, away_team: trimmedAway, game_time: time },
       );
       if (hasWarnings(found)) {
         setWarnings(found);
@@ -1178,7 +1192,7 @@ const AddGameForm = ({
     try {
       const result = await insertGames.mutateAsync([
         {
-          date,
+          date: formDate,
           home_team: trimmedHome,
           away_team: trimmedAway,
           competition: comp,
@@ -1210,6 +1224,17 @@ const AddGameForm = ({
       <div className="grid grid-cols-2 gap-2">
         <Input value={home} onChange={(e) => setHome(e.target.value)} placeholder="Time casa / Evento" className="h-8 text-xs" />
         <Input value={away} onChange={(e) => setAway(e.target.value)} placeholder="Visitante (vazio = evento)" className="h-8 text-xs" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} aria-label="Data do jogo" className="h-8 text-xs" />
+        <p className="text-[11px] text-muted-foreground self-center">
+          {validAddTime && formDate
+            ? isDawnGame(time)
+              ? `🌙 Vai para ${formatDayMonth(formDate)} às ${time} — fim do dia: acontece em ${formatDayMonth(getEffectiveGameDate(formDate, time))} às ${time} (Brasília).`
+              : `Vai para ${formatDayMonth(formDate)} às ${time} (Brasília).`
+            : "Escolha a data e o horário do jogo."}
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-2">

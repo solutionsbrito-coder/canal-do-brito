@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Upload, Loader2, Image as ImageIcon, ClipboardPaste, Clock, PowerOff, AlertCircle, Search, X, Power, Trash2, Copy, Sparkles } from "lucide-react";
 import { getScheduleDate, isFutureSchedule } from "@/lib/dateUtils";
+import { getLocalDateString } from "@/lib/gameUtils";
 import { useLiveTick } from "@/hooks/useLiveTick";
 import { toast } from "sonner";
 import {
@@ -429,7 +430,9 @@ const AdminProgramacao = () => {
       const file = valid[i];
       try {
         const ext = file.name?.split(".").pop()?.toLowerCase() || "png";
-        const today = new Date().toISOString().split("T")[0];
+        // Data de hoje em Brasília: o corte UTC (toISOString) já seria o dia
+        // seguinte depois das 21h em São Paulo.
+        const today = getLocalDateString();
         const path = `${selectedCategory}/${today}/${Date.now()}-${i}.${ext}`;
         const { error: upErr } = await supabase.storage.from("banners").upload(path, file);
         if (upErr) throw upErr;
