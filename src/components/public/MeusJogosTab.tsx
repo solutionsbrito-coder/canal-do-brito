@@ -3,7 +3,7 @@ import { CalendarDays, Heart, Star, X } from "lucide-react";
 import { useAllDailyGamesRange } from "@/hooks/useDailyGames";
 import { useMeuCanal } from "@/hooks/useMeuCanal";
 import { hasAnyFollow, matchesFollowed } from "@/lib/meuCanal";
-import { getLocalDateString, SPORT_LABEL, type SportType } from "@/lib/gameUtils";
+import { getLocalDateString, SPORT_LABEL, belongsToDayView, type SportType } from "@/lib/gameUtils";
 import { detectedSport } from "@/components/agenda/public/highlightsCuration";
 import { GamePremiumCard } from "@/components/agenda/public/GamePremiumCard";
 import { GlobalNotificationToggle } from "@/components/public/GlobalNotificationToggle";
@@ -68,8 +68,10 @@ const MeusJogosTab = () => {
   }, [allGames, prefs]);
 
   const following = hasAnyFollow(prefs);
-  const todayGames = myGames.filter((g) => g.date === today);
-  const tomorrowGames = myGames.filter((g) => g.date === tomorrow);
+  // Dia esportivo: cada dia inclui os jogos da madrugada (00:00–04:59)
+  // arquivados no dia anterior, que acontecem nas primeiras horas do dia visto.
+  const todayGames = myGames.filter((g) => belongsToDayView(g, today));
+  const tomorrowGames = myGames.filter((g) => belongsToDayView(g, tomorrow));
 
   const chip = "inline-flex items-center gap-1 min-h-[36px] px-3 rounded-full text-[11px] font-semibold border transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70";
 

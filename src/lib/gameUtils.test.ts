@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { isGameCurrentlyLive, getLocalDateString, getElapsedMinutes, getMinutesUntilStart, getEffectiveGameDate, isDawnGame, detectSportType } from "./gameUtils";
+import { isGameCurrentlyLive, getLocalDateString, getElapsedMinutes, getMinutesUntilStart, getEffectiveGameDate, getGameStatus, isDawnGame, belongsToDayView, offsetDateString, detectSportType } from "./gameUtils";
 
 /**
  * Helper: creates a Date that represents a specific time in São Paulo (UTC-3).
@@ -317,5 +317,89 @@ describe("sports day — dawn games (00:00–04:59) happen at the END of the pro
     vi.setSystemTime(spDate(2026, 3, 19, 23, 30));
     expect(isGameCurrentlyLive("23:00", "2026-03-19", "football")).toBe(true);
     expect(getElapsedMinutes("23:00", "2026-03-19", "football")).toBe(30);
+  });
+});
+
+describe("offsetDateString", () => {
+  it("shifts by -1 day across month and year boundaries", () => {
+    expect(offsetDateString("2026-11-08", -1)).toBe("2026-11-07");
+    expect(offsetDateString("2026-11-01", -1)).toBe("2026-10-31");
+    expect(offsetDateString("2026-01-01", -1)).toBe("2025-12-31");
+    expect(offsetDateString("2026-03-01", -1)).toBe("2026-02-28");
+  });
+
+  it("shifts by +1 day", () => {
+    expect(offsetDateString("2026-11-07", 1)).toBe("2026-11-08");
+    expect(offsetDateString("2026-12-31", 1)).toBe("2027-01-01");
+  });
+});
+
+describe("belongsToDayView (dawn carryover)", () => {
+  const dawn = { date: "2026-11-07", game_time: "00:00" };
+  const late = { date: "2026-11-07", game_time: "23:00" };
+  const edge = { date: "2026-11-07", game_time: "05:00" };
+
+  it("a game belongs to its own day's view", () => {
+    expect(belongsToDayView(dawn, "2026-11-07")).toBe(true);
+    expect(belongsToDayView(late, "2026-11-07")).toBe(true);
+  });
+
+  it("a previous-day dawn game belongs to the next day's view", () => {
+    expect(belongsToDayView(dawn, "2026-11-08")).toBe(true);
+    expect(belongsToDayView({ date: "2026-11-07", game_time: "04:59" }, "2026-11-08")).toBe(true);
+  });
+
+  it("a previous-day late game does NOT belong to the next day's view", () => {
+    expect(belongsToDayView(late, "2026-11-08")).toBe(false);
+  });
+
+  it("05:00 is not a dawn game, so it does NOT carry over", () => {
+    expect(belongsToDayView(edge, "2026-11-08")).toBe(false);
+  });
+
+  it("a game from two days before does NOT belong", () => {
+    expect(belongsToDayView(dawn, "2026-11-09")).toBe(false);
+  });
+});
+
+describe("dawn carryover live window — Portland x Spurs, 07/11 00:00 (NBA)", () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  const spurs = {
+    date: "2026-11-07",
+    game_time: "00:00",
+    sport_type: "basketball",
+    home_team: "Portland Trail Blazers",
+    away_team: "San Antonio Spurs",
+  };
+  const lateGame = { date: "2026-11-07", game_time: "23:00", sport_type: "basketball" };
+
+  it("at 00:30 on 08/11 the game is in the 08/11 view and live", () => {
+    vi.setSystemTime(spDate(2026, 11, 8, 0, 30));
+    expect(belongsToDayView(spurs, "2026-11-08")).toBe(true);
+    expect(isGameCurrentlyLive(spurs.game_time, spurs.date, "basketball")).toBe(true);
+    expect(getGameStatus(spurs)).toBe("live");
+    expect(getElapsedMinutes(spurs.game_time, spurs.date, "basketball")).toBe(30);
+  });
+
+  it("at 12:00 on 08/11 the game is still in the view but ended (duration + buffer)", () => {
+    vi.setSystemTime(spDate(2026, 11, 8, 12, 0));
+    expect(belongsToDayView(spurs, "2026-11-08")).toBe(true);
+    expect(isGameCurrentlyLive(spurs.game_time, spurs.date, "basketball")).toBe(false);
+    expect(getGameStatus(spurs)).toBe("ended");
+    expect(getElapsedMinutes(spurs.game_time, spurs.date, "basketball")).toBe(null);
+  });
+
+  it("at 10:00 on 07/11 the game is upcoming in the 07/11 view", () => {
+    vi.setSystemTime(spDate(2026, 11, 7, 10, 0));
+    expect(belongsToDayView(spurs, "2026-11-07")).toBe(true);
+    expect(getGameStatus(spurs)).toBe("upcoming");
+    expect(getMinutesUntilStart(spurs.game_time, spurs.date)).toBe(840);
+  });
+
+  it("a 23:00 game on 07/11 does NOT appear in the 08/11 view", () => {
+    vi.setSystemTime(spDate(2026, 11, 8, 0, 30));
+    expect(belongsToDayView(lateGame, "2026-11-08")).toBe(false);
   });
 });

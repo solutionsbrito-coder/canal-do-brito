@@ -185,6 +185,32 @@ export function isDawnGame(gameTime: string): boolean {
   return (gameTime || "00:00").slice(0, 5) < DAWN_CUTOFF;
 }
 
+/** Shift a YYYY-MM-DD date by N calendar days (pure UTC arithmetic,
+ * independent of the browser timezone). */
+export function offsetDateString(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, (m || 1) - 1, (d || 1) + days));
+  const yy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+/**
+ * Day-view membership (dia esportivo): a game belongs to the view of day
+ * D when its stored date is D, or when it is a dawn game (00:00–04:59)
+ * stored under D−1 — those happen in the early hours of D, so the "today"
+ * live strip must include them even though they are filed under yesterday.
+ * A late-night game (e.g. 23:00 on D−1) does NOT carry over.
+ */
+export function belongsToDayView(
+  game: { date: string; game_time: string },
+  viewDate: string,
+): boolean {
+  if (game.date === viewDate) return true;
+  return game.date === offsetDateString(viewDate, -1) && isDawnGame(game.game_time);
+}
+
 /**
  * Returns an absolute Date for a game given its date (YYYY-MM-DD) and time (HH:MM)
  * in the America/Sao_Paulo timezone (UTC-3).
