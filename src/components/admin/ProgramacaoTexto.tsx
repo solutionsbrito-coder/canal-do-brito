@@ -7,7 +7,7 @@ import { useChannelMappings } from "@/hooks/useChannelMappings";
 import { Checkbox } from "@/components/ui/checkbox";
 import { gameKey } from "@/lib/dedup";
 import { isChannelFragment } from "@/components/public/channelLogos";
-import { getLocalDateString, midnightInSaoPaulo, isDawnGame, getEffectiveGameDate } from "@/lib/gameUtils";
+import { getLocalDateString, midnightInSaoPaulo, isDawnGame, getEffectiveGameDate, getGameTimestamp, sortByEffectiveStart, formatEffectiveGameDateTime } from "@/lib/gameUtils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -831,6 +831,34 @@ function formatDatePt(dateStr: string): string {
   return `${d}/${m}/${y}`;
 }
 
+export interface PreviewRow {
+  key: string;
+  teams: string;
+  /** Programming day (stored date) as YYYY-MM-DD. */
+  date: string;
+  gameTime: string;
+  /** Effective (sports-day) start instant as "DD/MM HH:mm" — D+1 for dawn games. */
+  effectiveLabel: string;
+  isDawn: boolean;
+}
+
+/**
+ * Rows for the pre-"Processar" preview: detected games sorted by their
+ * EFFECTIVE start instant (dawn games last, in sequence), each with the
+ * programming date/time and the effective datetime, so the admin sees
+ * before processing that e.g. a 00:00 game on 07/11 is worth 08/11 00:00.
+ */
+export function buildPreviewRows(games: ParsedGame[]): PreviewRow[] {
+  return sortByEffectiveStart(games).map((g, i) => ({
+    key: `${g.date}|${g.game_time}|${g.home_team}|${g.away_team}|${i}`,
+    teams: g.away_team ? `${g.home_team} x ${g.away_team}` : g.home_team,
+    date: g.date,
+    gameTime: g.game_time || "—",
+    effectiveLabel: g.game_time ? formatEffectiveGameDateTime(g.date, g.game_time) : "—",
+    isDawn: !!g.game_time && isDawnGame(g.game_time),
+  }));
+}
+
 export type WarningCtx = {
   knownChannel?: (name: string) => boolean;
   hasLogo?: (name: string) => boolean;
@@ -949,12 +977,22 @@ function generateWhatsAppSummary(games: ParsedGame[]): string {
   return lines.join("\n").trim();
 }
 
-export const ProgramacaoTexto = () => {
+export interface ProgramacaoTextoProps {
+  /** Programming date, controlled by AdminProgramacao so the paste flow and
+   * the published list (DailyGamesManager) share one date. Uncontrolled
+   * (own state) when omitted. */
+  selectedDate?: string;
+  onSelectedDateChange?: (date: string) => void;
+}
+
+export const ProgramacaoTexto = ({ selectedDate: controlledDate, onSelectedDateChange }: ProgramacaoTextoProps = {}) => {
   const { user } = useAuth();
   const { data: channelMappings } = useChannelMappings();
   const today = getLocalDateString();
   const [text, setText] = useState("");
-  const [selectedDate, setSelectedDate] = useState(today);
+  const [internalDate, setInternalDate] = useState(today);
+  const selectedDate = controlledDate ?? internalDate;
+  const setSelectedDate = onSelectedDateChange ?? setInternalDate;
   const [parsed, setParsed] = useState<ParsedGame[]>([]);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [scheduleMidnight, setScheduleMidnight] = useState(false);
@@ -1199,15 +1237,15 @@ export const ProgramacaoTexto = () => {
     }
   };
 
-  // Live preview counter — debounced parse to show "X jogos detectados" as user types/pastes
-  const [liveCount, setLiveCount] = useState(0);
+  // Live preview — debounced parse to show the detected games (with their
+  // effective date/time) as the user types/pastes, BEFORE "Processar"
+  const [livePreviewRows, setLivePreviewRows] = useState<PreviewRow[]>([]);
   useEffect(() => {
-    if (!text.trim()) { setLiveCount(0); return; }
+    if (!text.trim()) { setLivePreviewRows([]); return; }
     const t = setTimeout(() => {
       try {
-        const games = parseScheduleText(text, selectedDate);
-        setLiveCount(games.length);
-      } catch { setLiveCount(0); }
+        setLivePreviewRows(buildPreviewRows(parseScheduleText(text, selectedDate)));
+      } catch { setLivePreviewRows([]); }
     }, 400);
     return () => clearTimeout(t);
   }, [text, selectedDate]);
@@ -1557,7 +1595,7 @@ export const ProgramacaoTexto = () => {
                 onChange={(e) => setSelectedDate(e.target.value)}
                 className="text-xs h-10 glass-panel border-white/[0.1]"
               />
-              <p className="text-[9px] text-muted-foreground">📅 Data destino: jogos sem 📅 no texto vão para <strong className="text-foreground">{formatDatePt(selectedDate)}</strong> — confira antes de colar</p>
+              <p className="text-[9px] text-muted-foreground">📅 Data destino: jogos sem 📅 no texto vão para <strong className="text-foreground">{formatDatePt(selectedDate)}</strong> — é a mesma data da lista de Jogos Publicados abaixo; mudar aqui muda lá também</p>
             </div>
 
             <div className={`flex items-center gap-3 p-3 rounded-xl glass-panel border ${
@@ -1684,12 +1722,41 @@ export const ProgramacaoTexto = () => {
           />
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] text-muted-foreground/60">💡 Cole texto do WhatsApp, ou cole/selecione uma imagem (a IA só roda se você clicar)</p>
-            {liveCount > 0 && (
+            {livePreviewRows.length > 0 && (
               <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 text-[10px] shrink-0">
-                {liveCount} jogo{liveCount !== 1 ? "s" : ""} detectado{liveCount !== 1 ? "s" : ""}
+                {livePreviewRows.length} jogo{livePreviewRows.length !== 1 ? "s" : ""} detectado{livePreviewRows.length !== 1 ? "s" : ""}
               </Badge>
             )}
           </div>
+
+          {/* Prévia antes de Processar: jogos detectados com data/hora efetiva.
+              A madrugada vale o fim do dia (00:00 de 07/11 vale 08/11 00:00) e
+              aparece por último, na sequência em que vai ao ar. */}
+          {livePreviewRows.length > 0 && parsed.length === 0 && (
+            <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold text-foreground">
+                  Prévia — {livePreviewRows.length} jogo{livePreviewRows.length !== 1 ? "s" : ""} detectado{livePreviewRows.length !== 1 ? "s" : ""} (antes de Processar)
+                </p>
+                <p className="text-[9px] text-muted-foreground">ordenado pelo horário efetivo</p>
+              </div>
+              <div className="max-h-56 overflow-y-auto scrollbar-none space-y-1">
+                {livePreviewRows.map((row) => (
+                  <div key={row.key} className="flex items-baseline justify-between gap-2 rounded-lg bg-white/[0.03] px-2.5 py-1.5">
+                    <p className="text-[11px] font-semibold text-foreground truncate">
+                      {row.teams}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground tabular-nums shrink-0">
+                      {formatDatePt(row.date)} {row.gameTime}
+                      {row.isDawn && (
+                        <span className="text-amber-300 font-semibold"> → vale {row.effectiveLabel} 🌙</span>
+                      )}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-wrap gap-2">
             <Button
@@ -1909,7 +1976,9 @@ export const ProgramacaoTexto = () => {
                 const rows = group.games
                   .map((g, li) => ({ g, idx: group.indices[li] }))
                   .filter(({ g, idx }) => g.selected && gameMatchesFilter(idx))
-                  .sort((a, b) => (a.g.game_time || "").localeCompare(b.g.game_time || ""));
+                  // Ordena pelo horário efetivo (dia esportivo), não pela string
+                  // do horário — jogos da madrugada (00:00–04:59) vão por último.
+                  .sort((a, b) => getGameTimestamp(a.g.date, a.g.game_time).getTime() - getGameTimestamp(b.g.date, b.g.game_time).getTime());
                 if (rows.length === 0) return null;
                 return (
                   <div key={date}>
@@ -1996,6 +2065,11 @@ export const ProgramacaoTexto = () => {
                                 </div>
                                 {game.competition_detail && (
                                   <p className="text-[10px] text-muted-foreground/70 mt-0.5 truncate">· {game.competition_detail}</p>
+                                )}
+                                {game.game_time && isDawnGame(game.game_time) && (
+                                  <p className="text-[10px] text-amber-300 font-semibold mt-0.5">
+                                    🌙 Vale {formatEffectiveGameDateTime(game.date, game.game_time)} (fim do dia {formatDatePt(game.date)})
+                                  </p>
                                 )}
                                 {hasVsWarning && (
                                   <button

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { isGameCurrentlyLive, getLocalDateString, getElapsedMinutes, getMinutesUntilStart, getEffectiveGameDate, getGameStatus, isDawnGame, belongsToDayView, offsetDateString, detectSportType } from "./gameUtils";
+import { isGameCurrentlyLive, getLocalDateString, getElapsedMinutes, getMinutesUntilStart, getEffectiveGameDate, getGameStatus, isDawnGame, belongsToDayView, offsetDateString, detectSportType, formatEffectiveGameDateTime, formatShortDateTime, sortByEffectiveStart } from "./gameUtils";
 
 /**
  * Helper: creates a Date that represents a specific time in São Paulo (UTC-3).
@@ -401,5 +401,46 @@ describe("dawn carryover live window — Portland x Spurs, 07/11 00:00 (NBA)", (
   it("a 23:00 game on 07/11 does NOT appear in the 08/11 view", () => {
     vi.setSystemTime(spDate(2026, 11, 8, 0, 30));
     expect(belongsToDayView(lateGame, "2026-11-08")).toBe(false);
+  });
+});
+
+describe("formatEffectiveGameDateTime / formatShortDateTime", () => {
+  it("dawn game shows D+1 (Portland x Spurs, 07/11 00:00 → 08/11 00:00)", () => {
+    expect(formatEffectiveGameDateTime("2026-11-07", "00:00")).toBe("08/11 00:00");
+  });
+
+  it("daytime game shows the same day", () => {
+    expect(formatEffectiveGameDateTime("2026-11-07", "20:00")).toBe("07/11 20:00");
+  });
+
+  it("05:00 is the cutoff — not a dawn game", () => {
+    expect(formatEffectiveGameDateTime("2026-11-07", "05:00")).toBe("07/11 05:00");
+  });
+
+  it("formatShortDateTime formats a Date in São Paulo time", () => {
+    // 2026-11-08 00:00 BRT = 03:00 UTC
+    expect(formatShortDateTime(new Date("2026-11-08T03:00:00Z"))).toBe("08/11 00:00");
+  });
+});
+
+describe("sortByEffectiveStart", () => {
+  it("dawn games come last in the programming day's sequence", () => {
+    const games = [
+      { date: "2026-11-07", game_time: "00:00" },
+      { date: "2026-11-07", game_time: "20:00" },
+      { date: "2026-11-07", game_time: "10:00" },
+      { date: "2026-11-07", game_time: "04:00" },
+    ];
+    const sorted = sortByEffectiveStart(games).map((g) => g.game_time);
+    expect(sorted).toEqual(["10:00", "20:00", "00:00", "04:00"]);
+  });
+
+  it("does not mutate the input array", () => {
+    const games = [
+      { date: "2026-11-07", game_time: "00:00" },
+      { date: "2026-11-07", game_time: "10:00" },
+    ];
+    sortByEffectiveStart(games);
+    expect(games[0].game_time).toBe("00:00");
   });
 });

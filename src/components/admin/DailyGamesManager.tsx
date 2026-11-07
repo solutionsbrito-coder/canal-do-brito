@@ -25,9 +25,18 @@ import { supabase } from "@/integrations/supabase/client";
 
 const SPORT_OPTIONS = Object.keys(SPORT_LABEL) as SportType[];
 
-export const DailyGamesManager = () => {
+export interface DailyGamesManagerProps {
+  /** Programming date, controlled by AdminProgramacao so the paste flow and
+   * this list share one date. Uncontrolled (own state) when omitted. */
+  selectedDate?: string;
+  onSelectedDateChange?: (date: string) => void;
+}
+
+export const DailyGamesManager = ({ selectedDate: controlledDate, onSelectedDateChange }: DailyGamesManagerProps = {}) => {
   const today = getLocalDateString();
-  const [selectedDate, setSelectedDate] = useState(today);
+  const [internalDate, setInternalDate] = useState(today);
+  const selectedDate = controlledDate ?? internalDate;
+  const setSelectedDate = onSelectedDateChange ?? setInternalDate;
   const queryClient = useQueryClient();
   const { data: games, isLoading } = useAllDailyGames(selectedDate);
   const updateGame = useUpdateDailyGame();
@@ -410,13 +419,16 @@ export const DailyGamesManager = () => {
 
           {/* Ações do dia — data + adicionar sempre visíveis; resto no menu */}
           <div className="flex flex-wrap items-center gap-2">
-            <Input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              aria-label="Data da programação"
-              className="glass-panel h-11 w-auto min-w-0 flex-1 border-white/[0.1] text-xs sm:flex-none"
-            />
+            <label className="flex flex-col gap-0.5" title="A mesma data vale para a colagem de programação acima e para esta lista — mudar aqui muda lá também.">
+              <span className="text-[9px] font-semibold text-muted-foreground">Data da programação</span>
+              <Input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                aria-label="Data da programação"
+                className="glass-panel h-11 w-auto min-w-0 flex-1 border-white/[0.1] text-xs sm:flex-none"
+              />
+            </label>
             <Button
               size="sm"
               variant="ghost"

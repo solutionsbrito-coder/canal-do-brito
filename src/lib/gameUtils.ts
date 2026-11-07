@@ -242,6 +242,41 @@ export function getEffectiveGameDate(gameDate: string, gameTime: string): string
 }
 
 /**
+ * Short "DD/MM HH:mm" label for a Date, in America/Sao_Paulo.
+ * Used for the effective game instant in the admin (activation list,
+ * paste-flow preview), where the stored date and the effective instant
+ * can differ (dawn games). Date and time are formatted separately:
+ * a single pt-BR toLocaleString inserts a comma ("08/11, 00:00").
+ */
+export function formatShortDateTime(d: Date): string {
+  const datePart = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+  }).format(d);
+  const timePart = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(d);
+  return `${datePart} ${timePart}`;
+}
+
+/** "DD/MM HH:mm" of a game's effective (sports-day) start instant. */
+export function formatEffectiveGameDateTime(gameDate: string, gameTime: string): string {
+  return formatShortDateTime(getGameTimestamp(gameDate, gameTime));
+}
+
+/** Sort games by their effective (sports-day) start instant — dawn games
+ * (00:00–04:59, effective D+1) come last in the programming day's sequence. */
+export function sortByEffectiveStart<T extends { date: string; game_time: string }>(games: T[]): T[] {
+  return [...games].sort(
+    (a, b) => getGameTimestamp(a.date, a.game_time).getTime() - getGameTimestamp(b.date, b.game_time).getTime(),
+  );
+}
+
+/**
  * Checks if a game is currently live based on its scheduled time and sport duration.
  */
 export function isGameCurrentlyLive(gameTime: string, gameDate: string, sportType: SportType = 'football'): boolean {
