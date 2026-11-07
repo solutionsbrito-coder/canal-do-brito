@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { gameKey } from "@/lib/dedup";
+import { belongsToDayView, offsetDateString } from "@/lib/gameUtils";
 import { toast } from "sonner";
 
 export interface DailyGame {
@@ -51,7 +52,7 @@ function readPublicScheduleCache(dates: string[]): DailyGame[] | undefined {
     if (!parsed || !Array.isArray(parsed.games) || !Array.isArray(parsed.dates)) return undefined;
     if (Date.now() - parsed.savedAt > 24 * 60 * 60_000) return undefined;
     if (!dates.every((date) => parsed.dates.includes(date))) return undefined;
-    return parsed.games.filter((game) => dates.includes(game.date));
+    return parsed.games.filter((game) => dates.some((d) => belongsToDayView(game, d)));
   } catch {
     return undefined;
   }
@@ -87,19 +88,28 @@ export const useDailyGames = (date: string) => {
   });
 };
 
-export const useAllDailyGames = (date: string) => {
+export const useAllDailyGames = (date: string, opts?: { includeDawnCarryover?: boolean }) => {
+  const includeDawnCarryover = opts?.includeDawnCarryover ?? false;
   return useQuery({
-    queryKey: ["daily_games", "all", date, "public"],
+    // A chave muda com o carryover para não colidir no cache com a
+    // leitura exata por data usada pelo admin.
+    queryKey: includeDawnCarryover
+      ? ["daily_games", "all", date, "public", "with-dawn-carryover"]
+      : ["daily_games", "all", date, "public"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("daily_games")
-        .select(PUBLIC_GAME_COLUMNS)
-        .eq("date", date)
+      const base = supabase.from("daily_games").select(PUBLIC_GAME_COLUMNS);
+      const withDate = includeDawnCarryover
+        ? base.in("date", [offsetDateString(date, -1), date])
+        : base.eq("date", date);
+      const { data, error } = await withDate
         .eq("source", "manual")
         .order("game_time", { ascending: true });
       if (error) throw error;
 
-      return data as DailyGame[];
+      const rows = data as DailyGame[];
+      return includeDawnCarryover
+        ? rows.filter((g) => belongsToDayView(g, date))
+        : rows;
     },
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
@@ -109,6 +119,10 @@ export const useAllDailyGames = (date: string) => {
 
 export const useAllDailyGamesRange = (dates: string[]) => {
   const stableDates = [...dates].sort();
+  // Dia esportivo: a visão de cada dia D inclui os jogos da madrugada
+  // (00:00–04:59) arquivados em D−1, que acontecem nas primeiras horas
+  // de D. O fetch busca esses dias também e filtra no cliente.
+  const fetchDates = [...new Set([...stableDates, ...stableDates.map((d) => offsetDateString(d, -1))])].sort();
   return useQuery({
     queryKey: ["daily_games", "all-range", stableDates],
     queryFn: async ({ signal }) => {
@@ -120,13 +134,15 @@ export const useAllDailyGamesRange = (dates: string[]) => {
         const { data, error } = await supabase
           .from("daily_games")
           .select(PUBLIC_GAME_COLUMNS)
-          .in("date", stableDates)
+          .in("date", fetchDates)
           .eq("source", "manual")
           .order("date", { ascending: true })
           .order("game_time", { ascending: true })
           .abortSignal(timeoutController.signal);
         if (error) throw error;
-        const games = data as DailyGame[];
+        const games = (data as DailyGame[]).filter((g) =>
+          stableDates.some((d) => belongsToDayView(g, d)),
+        );
         writePublicScheduleCache(stableDates, games);
         return games;
       } finally {
