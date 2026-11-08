@@ -267,23 +267,30 @@ describe("getMinutesUntilStart", () => {
   });
 });
 
-describe("sports day — dawn games (00:00–04:59) happen at the END of the programming day", () => {
+describe("sports day — ONLY the 00:00 game happens at the END of the programming day", () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 
   it("effective date of a 00:00 game is the next day", () => {
     expect(getEffectiveGameDate("2026-03-20", "00:00")).toBe("2026-03-21");
-    expect(getEffectiveGameDate("2026-03-20", "04:59")).toBe("2026-03-21");
   });
 
-  it("effective date does not move for 05:00+ games", () => {
+  it("effective date does not move for 00:10, 01:00, 03:00, 04:00, 04:59 or later games", () => {
+    expect(getEffectiveGameDate("2026-03-20", "00:10")).toBe("2026-03-20");
+    expect(getEffectiveGameDate("2026-03-20", "01:00")).toBe("2026-03-20");
+    expect(getEffectiveGameDate("2026-03-20", "03:00")).toBe("2026-03-20");
+    expect(getEffectiveGameDate("2026-03-20", "04:00")).toBe("2026-03-20");
+    expect(getEffectiveGameDate("2026-03-20", "04:59")).toBe("2026-03-20");
     expect(getEffectiveGameDate("2026-03-20", "05:00")).toBe("2026-03-20");
     expect(getEffectiveGameDate("2026-03-20", "23:00")).toBe("2026-03-20");
   });
 
-  it("isDawnGame is true only before 05:00", () => {
+  it("isDawnGame is true only for exactly 00:00", () => {
     expect(isDawnGame("00:00")).toBe(true);
-    expect(isDawnGame("04:59")).toBe(true);
+    expect(isDawnGame("00:01")).toBe(false);
+    expect(isDawnGame("00:10")).toBe(false);
+    expect(isDawnGame("01:00")).toBe(false);
+    expect(isDawnGame("04:59")).toBe(false);
     expect(isDawnGame("05:00")).toBe(false);
     expect(isDawnGame("23:00")).toBe(false);
   });
@@ -344,9 +351,14 @@ describe("belongsToDayView (dawn carryover)", () => {
     expect(belongsToDayView(late, "2026-11-07")).toBe(true);
   });
 
-  it("a previous-day dawn game belongs to the next day's view", () => {
+  it("a previous-day 00:00 game belongs to the next day's view", () => {
     expect(belongsToDayView(dawn, "2026-11-08")).toBe(true);
-    expect(belongsToDayView({ date: "2026-11-07", game_time: "04:59" }, "2026-11-08")).toBe(true);
+  });
+
+  it("previous-day 00:10, 04:00 and 04:59 games do NOT belong to the next day's view", () => {
+    expect(belongsToDayView({ date: "2026-11-07", game_time: "00:10" }, "2026-11-08")).toBe(false);
+    expect(belongsToDayView({ date: "2026-11-07", game_time: "04:00" }, "2026-11-08")).toBe(false);
+    expect(belongsToDayView({ date: "2026-11-07", game_time: "04:59" }, "2026-11-08")).toBe(false);
   });
 
   it("a previous-day late game does NOT belong to the next day's view", () => {
@@ -424,15 +436,17 @@ describe("formatEffectiveGameDateTime / formatShortDateTime", () => {
 });
 
 describe("sortByEffectiveStart", () => {
-  it("dawn games come last in the programming day's sequence", () => {
+  it("only the 00:00 game goes last in the programming day's sequence", () => {
     const games = [
       { date: "2026-11-07", game_time: "00:00" },
       { date: "2026-11-07", game_time: "20:00" },
       { date: "2026-11-07", game_time: "10:00" },
       { date: "2026-11-07", game_time: "04:00" },
     ];
+    // 04:00 stays on 07/11 (its effective instant is 07/11 04:00, first);
+    // only 00:00 moves to 08/11 and goes last.
     const sorted = sortByEffectiveStart(games).map((g) => g.game_time);
-    expect(sorted).toEqual(["10:00", "20:00", "00:00", "04:00"]);
+    expect(sorted).toEqual(["04:00", "10:00", "20:00", "00:00"]);
   });
 
   it("does not mutate the input array", () => {

@@ -194,9 +194,10 @@ describe("splitChannels — separadores múltiplos", () => {
   });
 });
 
-describe("Sports day: dawn games (00:00–04:59) keep the programming date", () => {
-  // A data gravada nunca muda: a madrugada vale o fim do dia da programação
-  // (o instante efetivo D+1 é calculado em getGameTimestamp, em gameUtils).
+describe("Sports day: games keep the programming date (only 00:00 moves to D+1)", () => {
+  // A data gravada nunca muda: só o jogo das 00:00 vale o fim do dia da
+  // programação (o instante efetivo D+1 é calculado em getGameTimestamp,
+  // em gameUtils). Jogos das 00:10 em diante ficam no dia D.
 
   it("keeps the header date for a 00:00 game", () => {
     const text = `📅 Dia 04/04

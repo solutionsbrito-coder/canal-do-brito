@@ -263,8 +263,8 @@ China x Curaçao
 
     const games = parseScheduleText(text, fallback);
     expect(games).toHaveLength(1);
-    // Sports day: 03:00 is dawn, so it keeps the header date (27/03) — the
-    // effective instant (28/03 03:00) is computed in getGameTimestamp.
+    // Sports day: only 00:00 moves to D+1, so a 03:00 game keeps the
+    // header date (27/03) and its effective instant is 27/03 03:00.
     expect(games[0].date).toBe(`${new Date().getFullYear()}-03-27`);
   });
 
@@ -306,7 +306,7 @@ Miami Open
     const games = parseScheduleText(text, fallback);
     expect(games).toHaveLength(4);
     expect(games[0].home_team).toBe("China");
-    // Sports day: 03:00 is dawn → keeps the header date (27/03)
+    // Sports day: only 00:00 moves to D+1 → 03:00 keeps the header date (27/03)
     expect(games[0].date).toBe(`${new Date().getFullYear()}-03-27`);
     expect(games[1].home_team).toBe("Inglaterra");
     expect(games[1].date).toBe(`${new Date().getFullYear()}-03-27`); // 16:45 — no bump
@@ -545,15 +545,17 @@ describe("buildPreviewRows (prévia antes de Processar)", () => {
     expect(rows[0].isDawn).toBe(false);
   });
 
-  it("rows are sorted by effective start — dawn games last", () => {
+  it("rows are sorted by effective start — only the 00:00 game goes last", () => {
     const rows = buildPreviewRows([
       { ...base, home_team: "Portland Trail Blazers", away_team: "San Antonio Spurs", date: "2026-11-07", game_time: "00:00" },
       { ...base, home_team: "Flamengo", away_team: "Palmeiras", date: "2026-11-07", game_time: "20:00" },
       { ...base, home_team: "Pumas", away_team: "América-MEX", date: "2026-11-07", game_time: "00:10" },
       { ...base, home_team: "Brasil", away_team: "Argentina", date: "2026-11-07", game_time: "10:00" },
     ]);
-    expect(rows.map((r) => r.gameTime)).toEqual(["10:00", "20:00", "00:00", "00:10"]);
-    expect(rows.map((r) => r.effectiveLabel)).toEqual(["07/11 10:00", "07/11 20:00", "08/11 00:00", "08/11 00:10"]);
+    // 00:10 stays on 07/11 (its effective instant is 07/11 00:10, first);
+    // only 00:00 moves to 08/11 and goes last.
+    expect(rows.map((r) => r.gameTime)).toEqual(["00:10", "10:00", "20:00", "00:00"]);
+    expect(rows.map((r) => r.effectiveLabel)).toEqual(["07/11 00:10", "07/11 10:00", "07/11 20:00", "08/11 00:00"]);
   });
 
   it("single event (no away team) shows only the home team", () => {
@@ -561,7 +563,7 @@ describe("buildPreviewRows (prévia antes de Processar)", () => {
       { ...base, home_team: "Abu Dhabi Championship — 3a Rodada", away_team: "", date: "2026-11-07", game_time: "04:00" },
     ]);
     expect(rows[0].teams).toBe("Abu Dhabi Championship — 3a Rodada");
-    expect(rows[0].effectiveLabel).toBe("08/11 04:00");
-    expect(rows[0].isDawn).toBe(true);
+    expect(rows[0].effectiveLabel).toBe("07/11 04:00");
+    expect(rows[0].isDawn).toBe(false);
   });
 });

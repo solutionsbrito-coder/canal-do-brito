@@ -119,9 +119,9 @@ export const useAllDailyGames = (date: string, opts?: { includeDawnCarryover?: b
 
 export const useAllDailyGamesRange = (dates: string[]) => {
   const stableDates = [...dates].sort();
-  // Dia esportivo: a visão de cada dia D inclui os jogos da madrugada
-  // (00:00–04:59) arquivados em D−1, que acontecem nas primeiras horas
-  // de D. O fetch busca esses dias também e filtra no cliente.
+  // Dia esportivo: a visão de cada dia D inclui o jogo das 00:00
+  // arquivado em D−1, que acontece à 00:00 de D. O fetch busca esses
+  // dias também e filtra no cliente.
   const fetchDates = [...new Set([...stableDates, ...stableDates.map((d) => offsetDateString(d, -1))])].sort();
   return useQuery({
     queryKey: ["daily_games", "all-range", stableDates],

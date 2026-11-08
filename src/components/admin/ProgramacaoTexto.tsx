@@ -800,9 +800,9 @@ export function parseScheduleText(
 
 
       // Dia esportivo: a data gravada é sempre o dia da programação, sem
-      // ajuste. Jogos de madrugada (00:00–04:59) acontecem no FIM desse dia
-      // (D+1 no relógio) — o instante efetivo é calculado em
-      // getGameTimestamp (gameUtils), não mudando a data aqui.
+      // ajuste. Só o jogo das 00:00 acontece no FIM desse dia (D+1 no
+      // relógio) — o instante efetivo é calculado em getGameTimestamp
+      // (gameUtils), não mudando a data aqui.
       const gameDate = currentDate;
 
       games.push(cleanupGame({
@@ -1316,7 +1316,7 @@ export const ProgramacaoTexto = ({ selectedDate: controlledDate, onSelectedDateC
   const [midnightConfirmOpen, setMidnightConfirmOpen] = useState(false);
   const [pendingPublishAction, setPendingPublishAction] = useState<"publish" | "republish" | null>(null);
 
-  const midnightGamesCount = parsed.filter((g) => g.selected && g.game_time < "05:00").length;
+  const midnightGamesCount = parsed.filter((g) => g.selected && isDawnGame(g.game_time)).length;
 
   const executePublish = async () => {
     const selected = parsed.filter((g) => g.selected);
@@ -1626,7 +1626,7 @@ export const ProgramacaoTexto = ({ selectedDate: controlledDate, onSelectedDateC
                   Madrugada vale o fim do dia
                 </p>
                 <p className="text-[9px] text-muted-foreground leading-tight">
-                  Jogos das 00:00 às 04:59 acontecem no fim do dia da programação (ex.: 00:00 de 07/11 vale 08/11 às 00:00, Brasília) e aparecem por último na lista do dia. A data gravada não muda.
+                  Só o jogo das 00:00 acontece no fim do dia da programação (ex.: 00:00 de 07/11 vale 08/11 às 00:00, Brasília) e aparece por último na lista do dia. Jogos das 00:10 em diante ficam no dia da programação. A data gravada não muda.
                 </p>
               </div>
             </div>
@@ -1977,7 +1977,7 @@ export const ProgramacaoTexto = ({ selectedDate: controlledDate, onSelectedDateC
                   .map((g, li) => ({ g, idx: group.indices[li] }))
                   .filter(({ g, idx }) => g.selected && gameMatchesFilter(idx))
                   // Ordena pelo horário efetivo (dia esportivo), não pela string
-                  // do horário — jogos da madrugada (00:00–04:59) vão por último.
+                  // do horário — só o jogo das 00:00 vai por último.
                   .sort((a, b) => getGameTimestamp(a.g.date, a.g.game_time).getTime() - getGameTimestamp(b.g.date, b.g.game_time).getTime());
                 if (rows.length === 0) return null;
                 return (
@@ -2337,11 +2337,11 @@ export const ProgramacaoTexto = ({ selectedDate: controlledDate, onSelectedDateC
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-500" />
-              Jogos de madrugada (00:00–04:59)
+              Jogo da meia-noite (00:00)
             </AlertDialogTitle>
             <AlertDialogDescription>
               {midnightGamesCount > 0 && (
-                <>{midnightGamesCount} jogo(s) selecionado(s) com horário antes das <strong>05:00</strong>.
+                <>{midnightGamesCount} jogo(s) selecionado(s) com horário às <strong>00:00</strong>.
                 Pela regra do dia esportivo, eles acontecem no <strong>fim do dia da programação</strong> (ex.: 00:00 de 07/11 vale 08/11 às 00:00, Brasília) e aparecem por último na lista do dia — a data gravada não muda.
                 <br /><br /></>
               )}

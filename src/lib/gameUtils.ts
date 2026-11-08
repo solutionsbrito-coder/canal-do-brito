@@ -174,15 +174,17 @@ export function getTomorrowDateString(): string {
 }
 
 /**
- * Cutoff for the "sports day" (dia esportivo): games before 05:00 belong to
- * the previous day's programming — they happen at the END of that day, not
- * at the start of the calendar day they are listed under.
+ * Sports-day rule (dia esportivo), corrected 08/11/2026: ONLY the game at
+ * exactly 00:00 moves to the next day — it happens at the END of its
+ * programming day (D+1 00:00, Brasília), not at the start of the calendar
+ * day it is listed under. Games at 00:10, 01:00, 03:00, 04:00 etc. stay
+ * on their stored date D. (The previous cutoff, < 05:00, was too wide.)
  */
-export const DAWN_CUTOFF = "05:00";
+export const MIDNIGHT_GAME_TIME = "00:00";
 
-/** Returns true for dawn games (00:00–04:59) — the ones the sports-day rule applies to. */
+/** Returns true only for the game at exactly 00:00 — the only one the sports-day rule moves to D+1. */
 export function isDawnGame(gameTime: string): boolean {
-  return (gameTime || "00:00").slice(0, 5) < DAWN_CUTOFF;
+  return (gameTime || "00:00").slice(0, 5) === MIDNIGHT_GAME_TIME;
 }
 
 /** Shift a YYYY-MM-DD date by N calendar days (pure UTC arithmetic,
@@ -198,10 +200,10 @@ export function offsetDateString(dateStr: string, days: number): string {
 
 /**
  * Day-view membership (dia esportivo): a game belongs to the view of day
- * D when its stored date is D, or when it is a dawn game (00:00–04:59)
- * stored under D−1 — those happen in the early hours of D, so the "today"
- * live strip must include them even though they are filed under yesterday.
- * A late-night game (e.g. 23:00 on D−1) does NOT carry over.
+ * D when its stored date is D, or when it is the 00:00 game stored under
+ * D−1 — it happens at 00:00 of D, so the "today" live strip must include
+ * it even though it is filed under yesterday. A 00:10 game on D−1 does
+ * NOT carry over, and neither does a late-night game (e.g. 23:00 on D−1).
  */
 export function belongsToDayView(
   game: { date: string; game_time: string },
@@ -215,11 +217,12 @@ export function belongsToDayView(
  * Returns an absolute Date for a game given its date (YYYY-MM-DD) and time (HH:MM)
  * in the America/Sao_Paulo timezone (UTC-3).
  *
- * Sports-day rule: `gameDate` is the programming day. A game at 00:00–04:59
- * listed under day D happens at the END of day D, i.e. D+1 at that clock
- * time (e.g. 00:00 on 07/11 is 08/11 00:00, Brasília). The stored `date`
- * never changes — only the effective instant moves, so the game keeps
- * showing on day D's list, last, in sequence.
+ * Sports-day rule: `gameDate` is the programming day. ONLY the game at
+ * exactly 00:00 listed under day D happens at the END of day D, i.e. D+1
+ * at that clock time (e.g. 00:00 on 07/11 is 08/11 00:00, Brasília).
+ * Games at 00:10 and later stay on D. The stored `date` never changes —
+ * only the effective instant moves, so the 00:00 game keeps showing on
+ * day D's list, last, in sequence.
  */
 export function getGameTimestamp(gameDate: string, gameTime: string): Date {
   const [h, m] = (gameTime || "00:00").split(":").map(Number);
@@ -235,7 +238,7 @@ export function getGameTimestamp(gameDate: string, gameTime: string): Date {
 
 /**
  * Effective (sports-day) date of a game as YYYY-MM-DD in America/Sao_Paulo:
- * D+1 for dawn games (00:00–04:59), D otherwise.
+ * D+1 only for the 00:00 game, D otherwise.
  */
 export function getEffectiveGameDate(gameDate: string, gameTime: string): string {
   return getLocalDateString(getGameTimestamp(gameDate, gameTime));
@@ -268,8 +271,8 @@ export function formatEffectiveGameDateTime(gameDate: string, gameTime: string):
   return formatShortDateTime(getGameTimestamp(gameDate, gameTime));
 }
 
-/** Sort games by their effective (sports-day) start instant — dawn games
- * (00:00–04:59, effective D+1) come last in the programming day's sequence. */
+/** Sort games by their effective (sports-day) start instant — the 00:00 game
+ * (effective D+1) comes last in the programming day's sequence. */
 export function sortByEffectiveStart<T extends { date: string; game_time: string }>(games: T[]): T[] {
   return [...games].sort(
     (a, b) => getGameTimestamp(a.date, a.game_time).getTime() - getGameTimestamp(b.date, b.game_time).getTime(),
