@@ -33,8 +33,8 @@ const SchedulePage = () => {
   const [sportFilter, setSportFilter] = useState<SportType | "all">("all");
 
   const activeDate = dateKey === "today" ? today : tomorrow;
-  // Dia esportivo: cada aba inclui os jogos da madrugada (00:00–04:59)
-  // arquivados no dia anterior, que acontecem nas primeiras horas do dia visto.
+  // Dia esportivo: cada aba inclui o jogo das 00:00 arquivado no dia
+  // anterior, que acontece à 00:00 do dia visto.
   const { data: todayGames = [], isLoading } = useAllDailyGames(today, { includeDawnCarryover: true });
   const { data: tomorrowGames = [] } = useAllDailyGames(tomorrow, { includeDawnCarryover: true });
 
@@ -61,8 +61,8 @@ const SchedulePage = () => {
       sportFilter === "all"
         ? games
         : games.filter((g) => (g.sport_type || "football") === sportFilter);
-    // Ordena pelo instante efetivo (dia esportivo): jogos de madrugada
-    // (00:00–04:59) acontecem no fim do dia e vão por último na lista.
+    // Ordena pelo instante efetivo (dia esportivo): só o jogo das 00:00
+    // acontece no fim do dia e vai por último na lista.
     return [...list].sort(
       (a, b) => getGameTimestamp(a.date, a.game_time).getTime() - getGameTimestamp(b.date, b.game_time).getTime(),
     );

@@ -73,7 +73,7 @@ const baseGame = (over: Record<string, unknown>) => ({
 
 const rows = [
   baseGame({ id: "dawn-0700", date: "2026-11-07", game_time: "00:00", home_team: "Portland Trail Blazers", away_team: "San Antonio Spurs" }),
-  baseGame({ id: "dawn-0400", date: "2026-11-07", game_time: "04:00", home_team: "Pumas", away_team: "América-MEX" }),
+  baseGame({ id: "early-0400", date: "2026-11-07", game_time: "04:00", home_team: "Pumas", away_team: "América-MEX" }),
   baseGame({ id: "edge-0500", date: "2026-11-07", game_time: "05:00", home_team: "Time C", away_team: "Time D" }),
   baseGame({ id: "late-2300", date: "2026-11-07", game_time: "23:00", home_team: "Time E", away_team: "Time F" }),
   baseGame({ id: "own-0030", date: "2026-11-08", game_time: "00:30", home_team: "Time G", away_team: "Time H" }),
@@ -89,13 +89,14 @@ describe("useAllDailyGamesRange — dawn carryover", () => {
     installBuilder();
   });
 
-  it("view 08/11 includes previous-day dawn games (00:00, 04:00) and excludes 23:00 and 05:00", async () => {
+  it("view 08/11 includes only the previous-day 00:00 game (04:00 stays on 07/11) and excludes 23:00 and 05:00", async () => {
     const { result } = renderHook(() => useAllDailyGamesRange(["2026-11-08"]), {
       wrapper: makeQueryWrapper(),
     });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     const ids = (result.current.data ?? []).map((g) => g.id);
-    expect(ids).toEqual(expect.arrayContaining(["dawn-0700", "dawn-0400", "own-0030", "own-1000"]));
+    expect(ids).toEqual(expect.arrayContaining(["dawn-0700", "own-0030", "own-1000"]));
+    expect(ids).not.toContain("early-0400");
     expect(ids).not.toContain("late-2300");
     expect(ids).not.toContain("edge-0500");
   });
@@ -129,6 +130,7 @@ describe("useAllDailyGames — includeDawnCarryover", () => {
     const ids = (result.current.data ?? []).map((g) => g.id);
     expect(ids).toContain("dawn-0700");
     expect(ids).toContain("own-1000");
+    expect(ids).not.toContain("early-0400");
     expect(ids).not.toContain("late-2300");
     expect(ids).not.toContain("edge-0500");
   });

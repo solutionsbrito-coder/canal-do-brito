@@ -188,8 +188,8 @@ const ProgramacaoTab = () => {
   const scheduleDates = useMemo(() => [today, tomorrow], [today, tomorrow]);
   const gamesQuery = useAllDailyGamesRange(scheduleDates);
   const { isLoading, isError, isFetching, dataUpdatedAt, refetch } = gamesQuery;
-  // Dia esportivo: a visão do dia inclui os jogos da madrugada (00:00–04:59)
-  // arquivados no dia anterior, que acontecem nas primeiras horas deste dia.
+  // Dia esportivo: a visão do dia inclui o jogo das 00:00 arquivado no
+  // dia anterior, que acontece à 00:00 deste dia.
   const rawGames = useMemo(() => (gamesQuery.data ?? []).filter((game) => belongsToDayView(game, date)), [gamesQuery.data, date]);
   const tomorrowGamesRaw = useMemo(
     () => (gamesQuery.data ?? []).filter((game) => game.date === (date === today ? tomorrow : today)),

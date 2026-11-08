@@ -68,8 +68,8 @@ const MeusJogosTab = () => {
   }, [allGames, prefs]);
 
   const following = hasAnyFollow(prefs);
-  // Dia esportivo: cada dia inclui os jogos da madrugada (00:00–04:59)
-  // arquivados no dia anterior, que acontecem nas primeiras horas do dia visto.
+  // Dia esportivo: cada dia inclui o jogo das 00:00 arquivado no dia
+  // anterior, que acontece à 00:00 do dia visto.
   const todayGames = myGames.filter((g) => belongsToDayView(g, today));
   const tomorrowGames = myGames.filter((g) => belongsToDayView(g, tomorrow));
 
