@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { DailyGame } from "@/hooks/useDailyGames";
 import type { GameStatus } from "@/lib/gameUtils";
-import { getMinutesUntilStart } from "@/lib/gameUtils";
+import { getMinutesUntilStart, sortByEffectiveStart } from "@/lib/gameUtils";
 import { GamePremiumCard } from "./GamePremiumCard";
 
 interface Props {
@@ -47,7 +47,9 @@ export const TimeSection = ({ games, statusById }: Props) => {
       }
       grp.games.push(g);
     }
-    for (const grp of out) grp.games.sort((a, b) => a.game_time.localeCompare(b.game_time));
+    // Ordena pelo instante efetivo (dia esportivo): só o jogo das 00:00
+    // acontece no fim do dia e vai por último na lista.
+    for (const grp of out) grp.games = sortByEffectiveStart(grp.games);
     if (statusById) out.sort((a, b) => BUCKET_ORDER.indexOf(a.key) - BUCKET_ORDER.indexOf(b.key));
     return out;
   }, [games, statusById]);
